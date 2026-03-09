@@ -1,0 +1,307 @@
+{
+  "2026-03-07": {
+    "attack": [
+      [
+        {
+          "id": "飞天大蟑螂",
+          "professions": [
+            "肉陌",
+            "控制陌"
+          ],
+          "startPlan": "压下路转中路",
+          "followPlan": "跟红车"
+        },
+        {
+          "id": "王荒炎",
+          "professions": [
+            "无名"
+          ],
+          "startPlan": "压下路转中路",
+          "followPlan": "跟红车"
+        },
+        {
+          "id": "涂慕辞",
+          "professions": [
+            "无名"
+          ],
+          "startPlan": "压下路转中路",
+          "followPlan": "跟红车"
+        },
+        {
+          "id": "穗穗平安",
+          "professions": [
+            "无名"
+          ],
+          "startPlan": "压下路转中路",
+          "followPlan": "跟红车"
+        },
+        {
+          "id": "常伴明月",
+          "professions": [
+            "陌奶",
+            "陌刀风扇"
+          ],
+          "startPlan": "压下路转中路",
+          "followPlan": "跟红车"
+        }
+      ],
+      [
+        {
+          "id": "鬼公仔",
+          "professions": [
+            "陌双"
+          ],
+          "startPlan": "压上路塔",
+          "followPlan": "25/15 Boss"
+        },
+        {
+          "id": "柿水",
+          "professions": [
+            "无名"
+          ],
+          "startPlan": "压上路塔",
+          "followPlan": "25/15 Boss"
+        },
+        {
+          "id": "攸风",
+          "professions": [
+            "无名"
+          ],
+          "startPlan": "压上路塔",
+          "followPlan": "25/15 Boss"
+        },
+        {
+          "id": "晏极",
+          "professions": [
+            "无名",
+            "打野"
+          ],
+          "startPlan": "压上路塔",
+          "followPlan": "25/15 Boss"
+        }
+      ],
+      [
+        {
+          "id": "斩红郎",
+          "professions": [
+            "陌刀",
+            "十方陌无名"
+          ],
+          "startPlan": "人墙反野",
+          "followPlan": "25/15 Boss"
+        },
+        {
+          "id": "三石",
+          "professions": [
+            "拳头"
+          ],
+          "startPlan": "人墙反野",
+          "followPlan": "25/15 Boss"
+        },
+        {
+          "id": "起风了",
+          "professions": [
+            "无名"
+          ],
+          "startPlan": "人墙反野",
+          "followPlan": "25/15 Boss"
+        }
+      ]
+    ],
+    "defense": [
+      [
+        {
+          "id": "费曼",
+          "professions": [
+            "无名",
+            "陌刀风扇"
+          ],
+          "startPlan": "守上塔",
+          "followPlan": "守蓝车杀人"
+        }
+      ],
+      [
+        {
+          "id": "沈晔行",
+          "professions": [
+            "无名",
+            "十方/风扇+无名"
+          ],
+          "startPlan": "守下塔",
+          "followPlan": "守蓝车杀人"
+        }
+      ],
+      []
+    ],
+    "availablePlayers": []
+  },
+  "2026-03-08": {
+    "attack": [
+      [],
+      [],
+      []
+    ],
+    "defense": [
+      [],
+      [],
+      []
+    ],
+    "availablePlayers": [
+      {
+        "id": "鬼公仔",
+        "professions": [
+          "陌双"
+        ]
+      },
+      {
+        "id": "震霸天",
+        "professions": [
+          "陌九",
+          "九九"
+        ]
+      },
+      {
+        "id": "飞天大蟑螂",
+        "professions": [
+          "肉陌",
+          "控制陌"
+        ]
+      },
+      {
+        "id": "风千杨",
+        "professions": [
+          "十方陌",
+          "陌刀"
+        ]
+      },
+      {
+        "id": "以年",
+        "professions": [
+          "肉陌",
+          "陌刀"
+        ]
+      },
+      {
+        "id": "费曼",
+        "professions": [
+          "无名",
+          "陌刀风扇"
+        ]
+      },
+      {
+        "id": "常伴明月",
+        "professions": [
+          "陌奶",
+          "陌刀风扇"
+        ]
+      },
+      {
+        "id": "斩红郎",
+        "professions": [
+          "陌刀",
+          "十方陌无名"
+        ]
+      },
+      {
+        "id": "秦兆丰",
+        "professions": [
+          "无名"
+        ]
+      },
+      {
+        "id": "王荒炎",
+        "professions": [
+          "无名"
+        ]
+      },
+      {
+        "id": "涂慕辞",
+        "professions": [
+          "无名"
+        ]
+      },
+      {
+        "id": "穗穗平安",
+        "professions": [
+          "无名"
+        ]
+      },
+      {
+        "id": "柿水",
+        "professions": [
+          "无名"
+        ]
+      },
+      {
+        "id": "宛有",
+        "professions": [
+          "无名"
+        ]
+      },
+      {
+        "id": "攸风",
+        "professions": [
+          "无名"
+        ]
+      },
+      {
+        "id": "晏极",
+        "professions": [
+          "无名",
+          "打野"
+        ]
+      },
+      {
+        "id": "三石",
+        "professions": [
+          "拳头"
+        ]
+      },
+      {
+        "id": "起风了",
+        "professions": [
+          "无名"
+        ]
+      },
+      {
+        "id": "柳雾轻烟",
+        "professions": [
+          "尘"
+        ]
+      },
+      {
+        "id": "安平君祝",
+        "professions": [
+          "纯奶"
+        ]
+      },
+      {
+        "id": "柴喵",
+        "professions": [
+          "纯奶"
+        ]
+      },
+      {
+        "id": "墨灵渊",
+        "professions": [
+          "纯奶",
+          "双扇"
+        ]
+      },
+      {
+        "id": "林镜流",
+        "professions": [
+          "纯奶"
+        ]
+      },
+      {
+        "id": "寒沉烟",
+        "professions": [
+          "纯奶"
+        ],
+        "startPlan": "",
+        "followPlan": ""
+      }
+    ]
+  }
+}

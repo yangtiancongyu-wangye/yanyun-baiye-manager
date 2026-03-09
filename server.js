@@ -6,6 +6,7 @@ const path = require('path');
 const fs = require('fs');
 const sharp = require('sharp');
 const { initializeData } = require('./init-data');
+const { pullData, debouncedCommit } = require('./git-storage');
 require('dotenv').config();
 
 const app = express();
@@ -404,8 +405,11 @@ const DATA_DIR = path.join(__dirname, 'data');
 const PLAYERS_FILE = path.join(DATA_DIR, 'players.json');
 const TEAMS_FILE = path.join(DATA_DIR, 'teams.json');
 
-// 初始化数据（包含默认玩家数据）
-initializeData(DATA_DIR, PLAYERS_FILE, TEAMS_FILE);
+// 启动时从 GitHub 拉取最新数据
+(async () => {
+    await pullData();
+    initializeData(DATA_DIR, PLAYERS_FILE, TEAMS_FILE);
+})();
 
 // 获取玩家数据
 app.get('/api/players', (req, res) => {
@@ -423,6 +427,10 @@ app.post('/api/players', (req, res) => {
     try {
         const players = req.body;
         fs.writeFileSync(PLAYERS_FILE, JSON.stringify(players, null, 2));
+
+        // 自动提交到 GitHub（5秒防抖）
+        debouncedCommit('更新玩家数据');
+
         res.json({ success: true });
     } catch (error) {
         console.error('保存玩家数据失败:', error);
@@ -446,6 +454,10 @@ app.post('/api/teams', (req, res) => {
     try {
         const teams = req.body;
         fs.writeFileSync(TEAMS_FILE, JSON.stringify(teams, null, 2));
+
+        // 自动提交到 GitHub（5秒防抖）
+        debouncedCommit('更新配队数据');
+
         res.json({ success: true });
     } catch (error) {
         console.error('保存配队数据失败:', error);

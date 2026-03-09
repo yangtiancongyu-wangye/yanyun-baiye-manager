@@ -3,6 +3,5 @@ uploads/
 .env
 *.log
 .DS_Store
-data/
 cloudflared.pkg
 .claude/
