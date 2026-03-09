@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>加州理工学院百业战管理工具-柴喵专属版</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>加州理工学院百业战管理工具-柴喵专属版</h1>
+            <nav>
+                <button class="nav-btn active" data-page="talent"><span>人才库</span></button>
+                <button class="nav-btn" data-page="team"><span>队伍管理</span></button>
+            </nav>
+        </header>
+
+        <!-- 人才库页面 -->
+        <div id="talent-page" class="page active">
+            <div class="toolbar">
+                <button id="add-player-btn" class="btn btn-primary">添加玩家</button>
+                <label class="btn btn-secondary">
+                    一键导入
+                    <input type="file" id="import-players-btn" accept="image/*" style="display: none;">
+                </label>
+            </div>
+
+            <div class="table-container">
+                <table id="talent-table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>职业</th>
+                            <th>备注</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="talent-tbody">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- 队伍管理页面 -->
+        <div id="team-page" class="page">
+            <div class="toolbar">
+                <label>百业战日期：
+                    <input type="date" id="battle-date">
+                </label>
+                <button id="create-new-date-btn" class="btn btn-primary">新建日期配队</button>
+                <button id="load-history-btn" class="btn btn-secondary">查看历史</button>
+                <button id="export-team-btn" class="btn btn-success">导出配队图片</button>
+            </div>
+
+            <div class="available-players">
+                <h3>可用玩家
+                    <span id="player-stats" style="margin-left: 15px; font-size: 14px; color: #000000; font-weight: normal;"></span>
+                    <button id="add-registration-btn" class="btn btn-secondary" style="margin-left: 10px; font-size: 14px;">添加报名玩家</button>
+                    <button id="import-registration-btn" class="btn btn-secondary" style="margin-left: 10px; font-size: 14px;">导入报名玩家</button>
+                    <button id="smart-assign-btn" class="btn btn-primary" style="margin-left: 10px; font-size: 14px;">智能配队</button>
+                </h3>
+                <div id="available-players-list" class="player-pool"></div>
+            </div>
+
+            <div class="teams-container">
+                <div class="brigade">
+                    <h2>进攻大队</h2>
+                    <div class="squads">
+                        <div class="squad" data-brigade="attack" data-squad="1">
+                            <h3>小队1</h3>
+                            <table class="squad-table">
+                                <thead>
+                                    <tr>
+                                        <th>人员</th>
+                                        <th>流派</th>
+                                        <th>开局安排</th>
+                                        <th>后续安排</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="squad-members" data-max="5"></tbody>
+                            </table>
+                        </div>
+                        <div class="squad" data-brigade="attack" data-squad="2">
+                            <h3>小队2</h3>
+                            <table class="squad-table">
+                                <thead>
+                                    <tr>
+                                        <th>人员</th>
+                                        <th>流派</th>
+                                        <th>开局安排</th>
+                                        <th>后续安排</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="squad-members" data-max="5"></tbody>
+                            </table>
+                        </div>
+                        <div class="squad" data-brigade="attack" data-squad="3">
+                            <h3>小队3</h3>
+                            <table class="squad-table">
+                                <thead>
+                                    <tr>
+                                        <th>人员</th>
+                                        <th>流派</th>
+                                        <th>开局安排</th>
+                                        <th>后续安排</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="squad-members" data-max="5"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="brigade">
+                    <h2>防守大队</h2>
+                    <div class="squads">
+                        <div class="squad" data-brigade="defense" data-squad="1">
+                            <h3>小队1</h3>
+                            <table class="squad-table">
+                                <thead>
+                                    <tr>
+                                        <th>人员</th>
+                                        <th>流派</th>
+                                        <th>开局安排</th>
+                                        <th>后续安排</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="squad-members" data-max="5"></tbody>
+                            </table>
+                        </div>
+                        <div class="squad" data-brigade="defense" data-squad="2">
+                            <h3>小队2</h3>
+                            <table class="squad-table">
+                                <thead>
+                                    <tr>
+                                        <th>人员</th>
+                                        <th>流派</th>
+                                        <th>开局安排</th>
+                                        <th>后续安排</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="squad-members" data-max="5"></tbody>
+                            </table>
+                        </div>
+                        <div class="squad" data-brigade="defense" data-squad="3">
+                            <h3>小队3</h3>
+                            <table class="squad-table">
+                                <thead>
+                                    <tr>
+                                        <th>人员</th>
+                                        <th>流派</th>
+                                        <th>开局安排</th>
+                                        <th>后续安排</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="squad-members" data-max="5"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 添加/编辑玩家模态框 -->
+    <div id="player-modal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2 id="modal-title">添加玩家</h2>
+            <form id="player-form">
+                <div class="form-group">
+                    <label>玩家ID：</label>
+                    <input type="text" id="player-id" required>
+                </div>
+                <div class="form-group">
+                    <label>职业（最多选2个）：</label>
+                    <select id="player-professions" multiple size="10">
+                        <option value="嗟夫刀法：裂石·威">嗟夫刀法：裂石·威</option>
+                        <option value="八方风雷枪：裂石·威">八方风雷枪：裂石·威</option>
+                        <option value="明川药典：牵丝·霖">明川药典：牵丝·霖</option>
+                        <option value="千香引魂蛊：牵丝·霖">千香引魂蛊：牵丝·霖</option>
+                        <option value="无名剑法：鸣金·虹">无名剑法：鸣金·虹</option>
+                        <option value="无名枪法：鸣金·虹">无名枪法：鸣金·虹</option>
+                        <option value="积矩九剑：鸣金·影">积矩九剑：鸣金·影</option>
+                        <option value="九曲惊神枪：鸣金·影">九曲惊神枪：鸣金·影</option>
+                        <option value="青山执笔：牵丝·玉">青山执笔：牵丝·玉</option>
+                        <option value="九重春色：牵丝·玉">九重春色：牵丝·玉</option>
+                        <option value="泥犁三垢：破竹·风">泥犁三垢：破竹·风</option>
+                        <option value="粟子游尘：破竹·风">粟子游尘：破竹·风</option>
+                        <option value="醉梦游春：破竹·尘">醉梦游春：破竹·尘</option>
+                        <option value="粟子行云：破竹·尘">粟子行云：破竹·尘</option>
+                        <option value="斩雪刀法：裂石·钧">斩雪刀法：裂石·钧</option>
+                        <option value="十方破阵：裂石·钧">十方破阵：裂石·钧</option>
+                        <option value="天志垂象：破竹·鸢">天志垂象：破竹·鸢</option>
+                        <option value="千机索天：破竹·鸢">千机索天：破竹·鸢</option>
+                    </select>
+                    <small>按住Ctrl/Cmd可多选</small>
+                </div>
+                <div class="form-group">
+                    <label>备注：</label>
+                    <textarea id="player-notes" rows="3"></textarea>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">保存</button>
+                    <button type="button" class="btn btn-secondary" id="cancel-btn">取消</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 导入报名玩家模态框 -->
+    <div id="import-registration-modal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeImportRegistrationModal()">&times;</span>
+            <h2>导入报名玩家</h2>
+            <div style="margin: 20px 0;">
+                <p style="margin-bottom: 15px;">请选择导入方式：</p>
+                <div style="display: flex; gap: 20px; flex-direction: column;">
+                    <div style="border: 2px dashed #ccc; padding: 30px; text-align: center; border-radius: 8px;">
+                        <p style="margin-bottom: 10px; font-size: 16px;">📋 方式一：截图粘贴</p>
+                        <p style="color: #666; font-size: 14px;">按 Ctrl+V (Mac: Cmd+V) 粘贴截图</p>
+                        <div id="paste-area" style="margin-top: 10px; min-height: 100px; display: flex; align-items: center; justify-content: center; background: #f5f5f5; border-radius: 4px;">
+                            <span style="color: #999;">等待粘贴图片...</span>
+                        </div>
+                    </div>
+                    <div style="text-align: center;">
+                        <p style="margin-bottom: 10px; font-size: 16px;">📁 方式二：上传文件</p>
+                        <label class="btn btn-primary" style="cursor: pointer;">
+                            选择图片文件
+                            <input type="file" id="import-registration-file" accept="image/*" style="display: none;">
+                        </label>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 历史记录模态框 -->
+    <div id="history-modal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeHistoryModal()">&times;</span>
+            <h2>历史配队记录</h2>
+            <div id="history-list"></div>
+        </div>
+    </div>
+
+    <!-- 添加报名玩家模态框 -->
+    <div id="add-registration-modal" class="modal">
+        <div class="modal-content" style="max-width: 800px;">
+            <span class="close" onclick="closeAddRegistrationModal()">&times;</span>
+            <h2>添加报名玩家</h2>
+            <div style="margin: 20px 0;">
+                <div style="margin-bottom: 15px;">
+                    <input type="text" id="search-player-input" placeholder="搜索玩家ID..." style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                </div>
+                <div id="player-selection-list" style="max-height: 400px; overflow-y: auto; border: 1px solid #ddd; border-radius: 4px; padding: 10px;">
+                    <!-- 玩家列表将在这里动态生成 -->
+                </div>
+                <div style="margin-top: 20px; text-align: right;">
+                    <button class="btn btn-secondary" onclick="closeAddRegistrationModal()">取消</button>
+                    <button class="btn btn-primary" onclick="confirmAddRegistration()">确认</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>

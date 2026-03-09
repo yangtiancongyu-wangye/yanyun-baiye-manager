@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: yanyun-baiye-manager
+    env: node
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_VERSION
+        value: 20.20.0
+      - key: PORT
+        value: 3000

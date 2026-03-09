@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>导入玩家数据</title>
+</head>
+<body>
+    <h1>导入玩家数据到人才库</h1>
+    <button onclick="importPlayers()" style="padding: 20px; font-size: 18px; background: green; color: white; border: none; cursor: pointer;">导入所有玩家</button>
+    <div id="result" style="margin-top: 20px;"></div>
+    <script>
+        const players = [
+          { id: "飞天大蟑螂", professions: ["嗟夫刀法", "八方风雷枪"], notes: "" },
+          { id: "鬼公仔", professions: ["嗟夫刀法", "泥犁三垢"], notes: "" },
+          { id: "震霸天", professions: ["积矩九剑", "九曲惊神枪"], notes: "" },
+          { id: "风千杨", professions: ["十方破阵", "嗟夫刀法"], notes: "" },
+          { id: "以年", professions: ["嗟夫刀法", "八方风雷枪"], notes: "" },
+          { id: "费曼", professions: ["无名剑法", "无名枪法"], notes: "" },
+          { id: "常伴明月", professions: ["嗟夫刀法", "青山执笔"], notes: "" },
+          { id: "斩红郎", professions: ["嗟夫刀法", "无名剑法"], notes: "" },
+          { id: "沈晔行", professions: ["无名剑法", "无名枪法"], notes: "" },
+          { id: "秦兆丰", professions: ["无名剑法", "无名枪法"], notes: "" },
+          { id: "王荒炎", professions: ["无名剑法", "无名枪法"], notes: "" },
+          { id: "涂慕辞", professions: ["无名剑法", "无名枪法"], notes: "" },
+          { id: "寂渴", professions: ["无名剑法", "无名枪法"], notes: "" },
+          { id: "穗穗平安", professions: ["无名剑法", "无名枪法"], notes: "" },
+          { id: "柿水", professions: ["无名剑法", "无名枪法"], notes: "" },
+          { id: "宛有", professions: ["无名剑法", "无名枪法"], notes: "" },
+          { id: "攸风", professions: ["无名剑法", "无名枪法"], notes: "" },
+          { id: "晏极", professions: ["无名剑法", "无名枪法"], notes: "" },
+          { id: "三石", professions: ["天志垂象", "千机索天"], notes: "" },
+          { id: "起风了", professions: ["无名剑法", "无名枪法"], notes: "" },
+          { id: "好婉", professions: ["醉梦游春", "粟子行云"], notes: "" },
+          { id: "撼山", professions: ["无名剑法", "无名枪法"], notes: "" },
+          { id: "柳雾轻烟", professions: ["醉梦游春", "粟子行云"], notes: "" },
+          { id: "卫君肃", professions: ["积矩九剑", "九曲惊神枪"], notes: "" },
+          { id: "晴翼", professions: ["醉梦游春", "粟子行云"], notes: "" },
+          { id: "十五重逢", professions: ["积矩九剑", "九曲惊神枪"], notes: "" },
+          { id: "羽杉", professions: ["积矩九剑", "九曲惊神枪"], notes: "" },
+          { id: "青未觉", professions: ["积矩九剑", "九曲惊神枪"], notes: "" },
+          { id: "佟生战兔", professions: ["积矩九剑", "九曲惊神枪"], notes: "" },
+          { id: "水中月天上光", professions: ["积矩九剑", "九曲惊神枪"], notes: "" },
+          { id: "斩秋风", professions: ["嗟夫刀法"], notes: "" },
+          { id: "今早不想起", professions: ["积矩九剑", "九曲惊神枪"], notes: "" },
+          { id: "薛星辰", professions: ["明川药典", "千香引魂蛊"], notes: "" },
+          { id: "安平君祝", professions: ["明川药典", "千香引魂蛊"], notes: "" },
+          { id: "叶音绮", professions: ["明川药典", "千香引魂蛊"], notes: "" },
+          { id: "柴喵", professions: ["明川药典", "千香引魂蛊"], notes: "" },
+          { id: "禄歆", professions: ["明川药典", "千香引魂蛊"], notes: "" },
+          { id: "墨灵渊", professions: ["明川药典", "千香引魂蛊"], notes: "" },
+          { id: "昭昭如曌", professions: ["明川药典", "千香引魂蛊"], notes: "" },
+          { id: "林镜流", professions: ["明川药典", "千香引魂蛊"], notes: "" },
+          { id: "寒沉烟", professions: ["明川药典", "千香引魂蛊"], notes: "" },
+          { id: "顾镜澄", professions: ["明川药典", "千香引魂蛊"], notes: "" },
+          { id: "青城山土豆精", professions: ["明川药典", "千香引魂蛊"], notes: "" },
+          { id: "南宫淮澜", professions: ["明川药典", "千香引魂蛊"], notes: "" },
+          { id: "江沄涧", professions: ["明川药典", "千香引魂蛊"], notes: "" },
+          { id: "百寂生", professions: ["醉梦游春", "粟子行云"], notes: "" }
+        ];
+
+        function importPlayers() {
+            // 清除现有数据
+            localStorage.removeItem('players');
+            localStorage.removeItem('teams');
+
+            // 导入新数据
+            localStorage.setItem('players', JSON.stringify(players));
+
+            document.getElementById('result').innerHTML = `
+                <p style="color: green; font-size: 18px;">✓ 成功导入 ${players.length} 个玩家！</p>
+                <p><a href="/" style="font-size: 16px;">返回主页查看</a></p>
+            `;
+        }
+    </script>
+</body>
+</html>

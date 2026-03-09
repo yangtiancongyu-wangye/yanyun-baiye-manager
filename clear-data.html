@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>清除数据</title>
+</head>
+<body>
+    <h1>清除所有数据</h1>
+    <button onclick="clearAll()" style="padding: 20px; font-size: 18px; background: red; color: white; border: none; cursor: pointer;">清除所有数据</button>
+    <script>
+        function clearAll() {
+            if (confirm('确定要清除所有人才库和队伍数据吗？此操作不可恢复！')) {
+                localStorage.removeItem('players');
+                localStorage.removeItem('teams');
+                alert('数据已清除！');
+                window.location.href = '/';
+            }
+        }
+    </script>
+</body>
+</html>
