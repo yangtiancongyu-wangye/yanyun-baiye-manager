@@ -1165,12 +1165,24 @@ function confirmAddRegistration() {
         };
     }
 
-    // 更新可用玩家列表（从全局状态）
+    // 收集所有已在配队中的玩家ID
+    const assignedPlayerIds = new Set();
+    teams[currentBattleDate].attack.forEach(squad => {
+        squad.forEach(member => assignedPlayerIds.add(member.id));
+    });
+    teams[currentBattleDate].defense.forEach(squad => {
+        squad.forEach(member => assignedPlayerIds.add(member.id));
+    });
+
+    // 更新可用玩家列表（排除已配队的玩家）
     const newAvailablePlayers = [];
     selectedPlayerIds.forEach(id => {
-        const player = players.find(p => p.id === id);
-        if (player) {
-            newAvailablePlayers.push({...player});
+        // 只添加未在配队中的玩家
+        if (!assignedPlayerIds.has(id)) {
+            const player = players.find(p => p.id === id);
+            if (player) {
+                newAvailablePlayers.push({...player});
+            }
         }
     });
 

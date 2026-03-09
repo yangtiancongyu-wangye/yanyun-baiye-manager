@@ -315,7 +315,7 @@ ${players.map(p => {
                     'Authorization': 'Bearer cr_885a369a5301a04d886ad0af117dd27a90cbbb2b96fedd7ce1bd64aebf38369a',
                     'Content-Type': 'application/json'
                 },
-                timeout: 25000, // 25秒超时，留出缓冲时间
+                timeout: 60000, // 60秒超时
                 validateStatus: function (status) {
                     return status >= 200 && status < 600; // 接受所有状态码，手动处理
                 }
