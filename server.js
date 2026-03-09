@@ -5,6 +5,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const sharp = require('sharp');
+const { initializeData } = require('./init-data');
 require('dotenv').config();
 
 const app = express();
@@ -284,7 +285,7 @@ ${players.map(p => {
 3. 如果玩家数量不足，某些小队可以少于5人或为空
 4. 优先保证每队有奶妈，如果奶妈不够，部分队伍可以没有奶妈
 
-返回JSON格式（每队最多5人，5号位优先是纯奶）：
+返回JSON格式（每队最多5人，1号位优先是陌刀，5号位优先是纯奶）：
 {
   "attack": [
     [{"id": "玩家1", "professions": ["职业1", "职业2"], "startPlan": "压下路转中路", "followPlan": "跟红车"}, ...],
@@ -305,7 +306,7 @@ ${players.map(p => {
             'https://cursor.scihub.edu.kg/api/v1/chat/completions',
             {
                 model: 'claude-sonnet-4-6',
-                max_tokens: 2048,
+                max_tokens: 4096,
                 messages: [{ role: 'user', content: prompt }]
             },
             {
@@ -403,22 +404,8 @@ const DATA_DIR = path.join(__dirname, 'data');
 const PLAYERS_FILE = path.join(DATA_DIR, 'players.json');
 const TEAMS_FILE = path.join(DATA_DIR, 'teams.json');
 
-// 确保数据目录存在
-if (!fs.existsSync(DATA_DIR)) {
-    fs.mkdirSync(DATA_DIR, { recursive: true });
-}
-
-// 初始化数据文件
-function initDataFiles() {
-    if (!fs.existsSync(PLAYERS_FILE)) {
-        fs.writeFileSync(PLAYERS_FILE, JSON.stringify([], null, 2));
-    }
-    if (!fs.existsSync(TEAMS_FILE)) {
-        fs.writeFileSync(TEAMS_FILE, JSON.stringify({}, null, 2));
-    }
-}
-
-initDataFiles();
+// 初始化数据（包含默认玩家数据）
+initializeData(DATA_DIR, PLAYERS_FILE, TEAMS_FILE);
 
 // 获取玩家数据
 app.get('/api/players', (req, res) => {
