@@ -45,11 +45,12 @@
         <!-- 队伍管理页面 -->
         <div id="team-page" class="page">
             <div class="toolbar">
-                <label>百业战日期：
-                    <input type="date" id="battle-date">
+                <label>百业战批次：
+                    <select id="battle-date-select" style="padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; min-width: 150px;">
+                        <option value="">请选择批次</option>
+                    </select>
                 </label>
-                <button id="create-new-date-btn" class="btn btn-primary">新建日期配队</button>
-                <button id="load-history-btn" class="btn btn-secondary">查看历史</button>
+                <button id="create-new-date-btn" class="btn btn-primary">新建百业战批次</button>
                 <button id="export-team-btn" class="btn btn-success">导出配队图片</button>
             </div>
 
@@ -236,12 +237,19 @@
         </div>
     </div>
 
-    <!-- 历史记录模态框 -->
-    <div id="history-modal" class="modal">
-        <div class="modal-content">
-            <span class="close" onclick="closeHistoryModal()">&times;</span>
-            <h2>历史配队记录</h2>
-            <div id="history-list"></div>
+    <!-- 新建批次模态框 -->
+    <div id="new-batch-modal" class="modal">
+        <div class="modal-content" style="max-width: 500px;">
+            <span class="close" onclick="closeNewBatchModal()">&times;</span>
+            <h2>新建百业战批次</h2>
+            <div style="margin: 30px 0;">
+                <label style="display: block; margin-bottom: 10px; font-weight: bold;">选择日期：</label>
+                <input type="date" id="new-batch-date" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px;">
+            </div>
+            <div style="margin-top: 20px; text-align: right;">
+                <button class="btn btn-secondary" onclick="closeNewBatchModal()">取消</button>
+                <button class="btn btn-primary" onclick="confirmNewBatch()">确认</button>
+            </div>
         </div>
     </div>
 

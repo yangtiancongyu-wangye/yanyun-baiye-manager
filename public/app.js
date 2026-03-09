@@ -11,10 +11,9 @@ const playerForm = document.getElementById('player-form');
 const addPlayerBtn = document.getElementById('add-player-btn');
 const importPlayersBtn = document.getElementById('import-players-btn');
 const importRegistrationBtn = document.getElementById('import-registration-btn');
-const battleDateInput = document.getElementById('battle-date');
+const battleDateSelect = document.getElementById('battle-date-select');
 const smartAssignBtn = document.getElementById('smart-assign-btn');
 const exportTeamBtn = document.getElementById('export-team-btn');
-const loadHistoryBtn = document.getElementById('load-history-btn');
 const createNewDateBtn = document.getElementById('create-new-date-btn');
 
 // 从服务器加载数据
@@ -59,10 +58,9 @@ async function saveTeams() {
 
 // 初始化
 document.addEventListener('DOMContentLoaded', async () => {
-    battleDateInput.value = currentBattleDate;
     await loadDataFromServer();
     renderTalentTable();
-    loadTeamData(currentBattleDate);
+    updateBatchSelect();
     setupEventListeners();
 });
 
@@ -84,14 +82,13 @@ function setupEventListeners() {
     document.getElementById('import-registration-btn').addEventListener('click', showImportRegistrationModal);
     document.getElementById('import-registration-file').addEventListener('change', handleImportRegistrationFile);
     document.getElementById('add-registration-btn').addEventListener('click', showAddRegistrationModal);
-    battleDateInput.addEventListener('change', (e) => {
+    battleDateSelect.addEventListener('change', (e) => {
         currentBattleDate = e.target.value;
         loadTeamData(currentBattleDate);
     });
     smartAssignBtn.addEventListener('click', handleSmartAssign);
     exportTeamBtn.addEventListener('click', handleExportTeam);
-    loadHistoryBtn.addEventListener('click', showHistoryDialog);
-    createNewDateBtn.addEventListener('click', createNewDateTeam);
+    createNewDateBtn.addEventListener('click', showNewBatchModal);
 
     document.querySelector('.close').addEventListener('click', closePlayerModal);
     document.getElementById('cancel-btn').addEventListener('click', closePlayerModal);
@@ -932,76 +929,72 @@ async function handleExportTeam() {
 }
 
 // 新建日期配队
-function createNewDateTeam() {
-    const newDate = prompt('请输入新的百业战日期（格式：YYYY-MM-DD）：', new Date().toISOString().split('T')[0]);
-    if (newDate && /^\d{4}-\d{2}-\d{2}$/.test(newDate)) {
-        currentBattleDate = newDate;
-        battleDateInput.value = newDate;
-        if (!teams[newDate]) {
-            teams[newDate] = {
-                attack: [[], [], []],
-                defense: [[], [], []],
-                availablePlayers: []
-            };
-            saveTeams();
-        }
-        loadTeamData(newDate);
-        alert(`已创建 ${newDate} 的配队`);
-    } else if (newDate) {
-        alert('日期格式不正确，请使用 YYYY-MM-DD 格式');
+// 更新批次下拉列表
+function updateBatchSelect() {
+    const dates = Object.keys(teams).sort().reverse(); // 从近到远排序
+    battleDateSelect.innerHTML = '<option value="">请选择批次</option>';
+
+    dates.forEach(date => {
+        const option = document.createElement('option');
+        option.value = date;
+        option.textContent = date;
+        battleDateSelect.appendChild(option);
+    });
+
+    // 如果有批次，默认选择最新的
+    if (dates.length > 0) {
+        currentBattleDate = dates[0];
+        battleDateSelect.value = currentBattleDate;
+        loadTeamData(currentBattleDate);
     }
 }
 
-// 历史记录
-function showHistoryDialog() {
-    const dates = Object.keys(teams).sort().reverse();
-    if (dates.length === 0) {
-        alert('暂无历史记录');
+// 显示新建批次模态框
+function showNewBatchModal() {
+    const modal = document.getElementById('new-batch-modal');
+    const dateInput = document.getElementById('new-batch-date');
+    dateInput.value = new Date().toISOString().split('T')[0];
+    modal.classList.add('active');
+}
+
+// 关闭新建批次模态框
+function closeNewBatchModal() {
+    document.getElementById('new-batch-modal').classList.remove('active');
+}
+
+// 确认新建批次
+function confirmNewBatch() {
+    const dateInput = document.getElementById('new-batch-date');
+    const newDate = dateInput.value;
+
+    if (!newDate) {
+        alert('请选择日期');
         return;
     }
 
-    const historyModal = document.getElementById('history-modal');
-    const historyList = document.getElementById('history-list');
-
-    historyList.innerHTML = `
-        <div class="history-dates">
-            ${dates.map(date => {
-                const teamData = teams[date];
-                const totalPlayers = teamData.attack.flat().length + teamData.defense.flat().length;
-                return `
-                    <div class="history-item">
-                        <div class="history-date">${date}</div>
-                        <div class="history-info">配队人数：${totalPlayers}</div>
-                        <div class="history-actions">
-                            <button class="btn btn-primary" onclick="loadHistoryDate('${date}')">加载</button>
-                            <button class="btn btn-danger" onclick="deleteHistoryDate('${date}')">删除</button>
-                        </div>
-                    </div>
-                `;
-            }).join('')}
-        </div>
-    `;
-
-    historyModal.classList.add('active');
-}
-
-function loadHistoryDate(date) {
-    currentBattleDate = date;
-    battleDateInput.value = date;
-    loadTeamData(date);
-    closeHistoryModal();
-}
-
-function deleteHistoryDate(date) {
-    if (confirm(`确定删除 ${date} 的配队记录吗？`)) {
-        delete teams[date];
-        saveTeams();
-        showHistoryDialog();
+    // 检查日期是否已存在
+    if (teams[newDate]) {
+        alert('该日期的批次已存在，请选择其他日期');
+        return;
     }
-}
 
-function closeHistoryModal() {
-    document.getElementById('history-modal').classList.remove('active');
+    // 创建新批次
+    teams[newDate] = {
+        attack: [[], [], []],
+        defense: [[], [], []],
+        availablePlayers: []
+    };
+
+    saveTeams();
+    updateBatchSelect();
+
+    // 切换到新批次
+    currentBattleDate = newDate;
+    battleDateSelect.value = newDate;
+    loadTeamData(newDate);
+
+    closeNewBatchModal();
+    alert(`已创建 ${newDate} 的百业战批次`);
 }
 
 // 加载提示
