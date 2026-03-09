@@ -307,7 +307,7 @@ ${players.map(p => {
             'https://cursor.scihub.edu.kg/api/v1/chat/completions',
             {
                 model: 'claude-sonnet-4-6',
-                max_tokens: 4096,
+                max_tokens: 4096                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             ,
                 messages: [{ role: 'user', content: prompt }]
             },
             {
@@ -404,11 +404,17 @@ ${players.map(p => {
 const DATA_DIR = path.join(__dirname, 'data');
 const PLAYERS_FILE = path.join(DATA_DIR, 'players.json');
 const TEAMS_FILE = path.join(DATA_DIR, 'teams.json');
+const LOTTERIES_FILE = path.join(DATA_DIR, 'lotteries.json');
 
 // 启动时从 GitHub 拉取最新数据
 (async () => {
     await pullData();
     initializeData(DATA_DIR, PLAYERS_FILE, TEAMS_FILE);
+
+    // 初始化抽奖数据文件
+    if (!fs.existsSync(LOTTERIES_FILE)) {
+        fs.writeFileSync(LOTTERIES_FILE, JSON.stringify([], null, 2));
+    }
 })();
 
 // 获取玩家数据
@@ -461,6 +467,33 @@ app.post('/api/teams', (req, res) => {
         res.json({ success: true });
     } catch (error) {
         console.error('保存配队数据失败:', error);
+        res.json({ success: false, error: error.message });
+    }
+});
+
+// 获取抽奖数据
+app.get('/api/lotteries', (req, res) => {
+    try {
+        const data = fs.readFileSync(LOTTERIES_FILE, 'utf8');
+        res.json(JSON.parse(data));
+    } catch (error) {
+        console.error('读取抽奖数据失败:', error);
+        res.json([]);
+    }
+});
+
+// 保存抽奖数据
+app.post('/api/lotteries', (req, res) => {
+    try {
+        const lotteries = req.body;
+        fs.writeFileSync(LOTTERIES_FILE, JSON.stringify(lotteries, null, 2));
+
+        // 自动提交到 GitHub（5秒防抖）
+        debouncedCommit('更新抽奖数据');
+
+        res.json({ success: true });
+    } catch (error) {
+        console.error('保存抽奖数据失败:', error);
         res.json({ success: false, error: error.message });
     }
 });

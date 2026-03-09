@@ -13,6 +13,7 @@
             <nav>
                 <button class="nav-btn active" data-page="talent"><span>人才库</span></button>
                 <button class="nav-btn" data-page="team"><span>队伍管理</span></button>
+                <button class="nav-btn" data-page="lottery"><span>百业抽奖助手</span></button>
             </nav>
         </header>
 
@@ -162,6 +163,33 @@
                 </div>
             </div>
         </div>
+
+        <!-- 百业抽奖助手页面 -->
+        <div id="lottery-page" class="page">
+            <div class="toolbar">
+                <button id="create-lottery-btn" class="btn btn-primary">新建抽奖</button>
+            </div>
+
+            <div class="lottery-records">
+                <h3>抽奖记录</h3>
+                <div class="table-container">
+                    <table id="lottery-table">
+                        <thead>
+                            <tr>
+                                <th>创建日期</th>
+                                <th>抽奖批次名</th>
+                                <th>奖品</th>
+                                <th>玩家人数</th>
+                                <th>中奖玩家</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="lottery-tbody">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- 添加/编辑玩家模态框 -->
@@ -270,6 +298,53 @@
                     <button class="btn btn-primary" onclick="confirmAddRegistration()">确认</button>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <!-- 新建/编辑抽奖模态框 -->
+    <div id="lottery-modal" class="modal">
+        <div class="modal-content" style="max-width: 700px;">
+            <span class="close" onclick="closeLotteryModal()">&times;</span>
+            <h2 id="lottery-modal-title">新建抽奖</h2>
+            <form id="lottery-form">
+                <div class="form-group">
+                    <label>抽奖批次名：</label>
+                    <input type="text" id="lottery-name" required>
+                </div>
+                <div class="form-group">
+                    <label>可中奖人数：</label>
+                    <select id="lottery-winner-count" required>
+                        <option value="1">1</option>
+                        <option value="2">2</option>
+                        <option value="3">3</option>
+                        <option value="4">4</option>
+                        <option value="5">5</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>奖品：</label>
+                    <div id="lottery-prizes-container">
+                        <input type="text" class="lottery-prize-input" placeholder="奖品1" required>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>玩家名单：</label>
+                    <div style="margin-bottom: 10px;">
+                        <input type="text" id="lottery-player-search" placeholder="搜索玩家ID..." style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                    </div>
+                    <div id="lottery-player-list" style="max-height: 200px; overflow-y: auto; border: 1px solid #ddd; border-radius: 4px; padding: 10px; margin-bottom: 10px;">
+                        <!-- 玩家列表 -->
+                    </div>
+                    <div id="lottery-selected-preview" style="min-height: 60px; padding: 10px; background: #f5f5f5; border-radius: 4px;">
+                        <div id="lottery-selected-tags" style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px;"></div>
+                        <div id="lottery-selected-count" style="color: #666; font-size: 14px;">当前已添加0名玩家</div>
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary" id="lottery-submit-btn">创建</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeLotteryModal()">取消</button>
+                </div>
+            </form>
         </div>
     </div>
 

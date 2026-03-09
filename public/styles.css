@@ -786,3 +786,72 @@ tbody tr:hover {
         width: 100%;
     }
 }
+
+/* 抽奖页面样式 */
+.lottery-records {
+    padding: 20px;
+}
+
+.lottery-records h3 {
+    font-size: 20px;
+    margin-bottom: 15px;
+    color: var(--text-primary);
+}
+
+#lottery-table {
+    width: 100%;
+}
+
+#lottery-table th {
+    background: linear-gradient(135deg, rgba(94, 179, 214, 0.15) 0%, rgba(126, 200, 227, 0.1) 100%);
+    padding: 12px;
+    text-align: left;
+    font-weight: bold;
+    color: var(--text-primary);
+}
+
+#lottery-table td {
+    padding: 12px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+}
+
+#lottery-table tr:hover {
+    background: rgba(94, 179, 214, 0.05);
+}
+
+.lottery-prize-input {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 14px;
+}
+
+#lottery-player-list {
+    background: #f9f9f9;
+}
+
+#lottery-selected-tags span {
+    cursor: default;
+}
+
+#lottery-modal .form-group {
+    margin-bottom: 20px;
+}
+
+#lottery-modal label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: bold;
+    color: var(--text-primary);
+}
+
+#lottery-modal input[type="text"],
+#lottery-modal select {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 14px;
+}

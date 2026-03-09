@@ -1,6 +1,7 @@
 // 数据存储
 let players = [];
 let teams = {};
+let lotteries = [];
 let currentBattleDate = new Date().toISOString().split('T')[0];
 
 // DOM元素
@@ -19,12 +20,14 @@ const createNewDateBtn = document.getElementById('create-new-date-btn');
 // 从服务器加载数据
 async function loadDataFromServer() {
     try {
-        const [playersRes, teamsRes] = await Promise.all([
+        const [playersRes, teamsRes, lotteriesRes] = await Promise.all([
             fetch('/api/players'),
-            fetch('/api/teams')
+            fetch('/api/teams'),
+            fetch('/api/lotteries')
         ]);
         players = await playersRes.json();
         teams = await teamsRes.json();
+        lotteries = await lotteriesRes.json();
     } catch (error) {
         console.error('加载数据失败:', error);
     }
@@ -61,6 +64,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     await loadDataFromServer();
     renderTalentTable();
     updateBatchSelect();
+    renderLotteryTable();
     setupEventListeners();
 });
 
@@ -98,6 +102,9 @@ function setupEventListeners() {
     setupPasteListener();
 
     setupDragAndDrop();
+
+    // 抽奖功能事件监听
+    setupLotteryEventListeners();
 }
 
 // 人才库相关
@@ -1185,4 +1192,360 @@ function confirmAddRegistration() {
     closeAddRegistrationModal();
 
     alert(`已更新报名玩家，当前共 ${newAvailablePlayers.length} 人`);
+}
+
+// ==================== 百业抽奖助手功能 ====================
+let selectedLotteryPlayers = new Set();
+let currentEditingLotteryIndex = null;
+
+// 保存抽奖数据
+async function saveLotteries() {
+    try {
+        await fetch('/api/lotteries', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(lotteries)
+        });
+    } catch (error) {
+        console.error('保存抽奖数据失败:', error);
+    }
+}
+
+// 渲染抽奖记录表格
+function renderLotteryTable() {
+    const tbody = document.getElementById('lottery-tbody');
+    if (!tbody) return;
+
+    tbody.innerHTML = '';
+
+    // 按创建时间从近到远排序
+    const sortedLotteries = [...lotteries].sort((a, b) =>
+        new Date(b.createTime) - new Date(a.createTime)
+    );
+
+    sortedLotteries.forEach((lottery, index) => {
+        const originalIndex = lotteries.findIndex(l => l.id === lottery.id);
+        const tr = document.createElement('tr');
+
+        // 格式化创建时间
+        const createTime = new Date(lottery.createTime).toLocaleString('zh-CN', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit'
+        });
+
+        // 奖品列表
+        const prizesHtml = lottery.prizes.join('<br>');
+
+        // 中奖玩家
+        let winnersHtml = '-';
+        if (lottery.winners && lottery.winners.length > 0) {
+            winnersHtml = lottery.winners.map((winner, idx) =>
+                `${lottery.prizes[idx]}：${winner}`
+            ).join('<br>');
+        }
+
+        // 操作按钮
+        let actionsHtml = '';
+        if (lottery.winners && lottery.winners.length > 0) {
+            actionsHtml = `
+                <button class="btn btn-secondary" onclick="viewLottery(${originalIndex})">查看</button>
+                <button class="btn btn-danger" onclick="deleteLottery(${originalIndex})">删除</button>
+            `;
+        } else {
+            actionsHtml = `
+                <button class="btn btn-primary" onclick="drawLottery(${originalIndex})">抽奖</button>
+                <button class="btn btn-secondary" onclick="editLottery(${originalIndex})">编辑</button>
+                <button class="btn btn-danger" onclick="deleteLottery(${originalIndex})">删除</button>
+            `;
+        }
+
+        tr.innerHTML = `
+            <td>${createTime}</td>
+            <td>${lottery.name}</td>
+            <td>${prizesHtml}</td>
+            <td>${lottery.playerIds.length}</td>
+            <td>${winnersHtml}</td>
+            <td>${actionsHtml}</td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
+// 打开新建/编辑抽奖弹窗
+function openLotteryModal(lotteryIndex = null) {
+    const modal = document.getElementById('lottery-modal');
+    const title = document.getElementById('lottery-modal-title');
+    const form = document.getElementById('lottery-form');
+    const submitBtn = document.getElementById('lottery-submit-btn');
+
+    // 重置表单
+    form.reset();
+    selectedLotteryPlayers.clear();
+    currentEditingLotteryIndex = lotteryIndex;
+
+    if (lotteryIndex !== null) {
+        const lottery = lotteries[lotteryIndex];
+        const isDrawn = lottery.winners && lottery.winners.length > 0;
+
+        title.textContent = isDrawn ? '查看抽奖' : '编辑抽奖';
+        submitBtn.textContent = isDrawn ? '关闭' : '保存';
+
+        // 填充数据
+        document.getElementById('lottery-name').value = lottery.name;
+        document.getElementById('lottery-winner-count').value = lottery.winnerCount;
+
+        // 填充奖品
+        updatePrizesInputs(lottery.winnerCount, lottery.prizes);
+
+        // 填充玩家
+        lottery.playerIds.forEach(id => selectedLotteryPlayers.add(id));
+
+        // 如果已抽奖，禁用所有输入
+        if (isDrawn) {
+            form.querySelectorAll('input, select').forEach(el => el.disabled = true);
+            submitBtn.type = 'button';
+            submitBtn.onclick = closeLotteryModal;
+        } else {
+            form.querySelectorAll('input, select').forEach(el => el.disabled = false);
+            submitBtn.type = 'submit';
+            submitBtn.onclick = null;
+        }
+    } else {
+        title.textContent = '新建抽奖';
+        submitBtn.textContent = '创建';
+        submitBtn.type = 'submit';
+        submitBtn.onclick = null;
+        form.querySelectorAll('input, select').forEach(el => el.disabled = false);
+        updatePrizesInputs(1);
+    }
+
+    renderLotteryPlayerList();
+    updateLotterySelectedPreview();
+
+    modal.classList.add('active');
+}
+
+// 关闭抽奖弹窗
+function closeLotteryModal() {
+    document.getElementById('lottery-modal').classList.remove('active');
+    selectedLotteryPlayers.clear();
+    currentEditingLotteryIndex = null;
+}
+
+// 更新奖品输入框
+function updatePrizesInputs(count, prizes = []) {
+    const container = document.getElementById('lottery-prizes-container');
+    container.innerHTML = '';
+
+    for (let i = 0; i < count; i++) {
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.className = 'lottery-prize-input';
+        input.placeholder = `奖品${i + 1}`;
+        input.required = true;
+        input.value = prizes[i] || '';
+        input.style.marginBottom = '8px';
+        container.appendChild(input);
+    }
+}
+
+// 渲染玩家选择列表
+function renderLotteryPlayerList(searchTerm = '') {
+    const container = document.getElementById('lottery-player-list');
+    container.innerHTML = '';
+
+    const filteredPlayers = players.filter(p => {
+        if (searchTerm) {
+            return p.id.includes(searchTerm);
+        }
+        return true;
+    });
+
+    if (filteredPlayers.length === 0) {
+        container.innerHTML = '<div style="text-align: center; padding: 20px; color: #999;">没有找到玩家</div>';
+        return;
+    }
+
+    filteredPlayers.forEach(player => {
+        const isSelected = selectedLotteryPlayers.has(player.id);
+        const item = document.createElement('div');
+        item.style.cssText = `
+            padding: 8px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+        `;
+
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.checked = isSelected;
+        checkbox.style.marginRight = '10px';
+
+        const label = document.createElement('label');
+        label.style.cssText = 'flex: 1; cursor: pointer;';
+        label.textContent = player.id;
+
+        item.onclick = () => {
+            checkbox.checked = !checkbox.checked;
+            if (checkbox.checked) {
+                selectedLotteryPlayers.add(player.id);
+            } else {
+                selectedLotteryPlayers.delete(player.id);
+            }
+            updateLotterySelectedPreview();
+        };
+
+        item.appendChild(checkbox);
+        item.appendChild(label);
+        container.appendChild(item);
+    });
+}
+
+// 更新已选玩家预览
+function updateLotterySelectedPreview() {
+    const tagsContainer = document.getElementById('lottery-selected-tags');
+    const countEl = document.getElementById('lottery-selected-count');
+
+    tagsContainer.innerHTML = '';
+
+    selectedLotteryPlayers.forEach(playerId => {
+        const tag = document.createElement('span');
+        tag.style.cssText = `
+            display: inline-block;
+            padding: 4px 8px;
+            background: #007bff;
+            color: white;
+            border-radius: 4px;
+            font-size: 12px;
+        `;
+        tag.textContent = playerId;
+        tagsContainer.appendChild(tag);
+    });
+
+    countEl.textContent = `当前已添加${selectedLotteryPlayers.size}名玩家`;
+}
+
+// 提交抽奖表单
+function handleLotterySubmit(e) {
+    e.preventDefault();
+
+    const name = document.getElementById('lottery-name').value.trim();
+    const winnerCount = parseInt(document.getElementById('lottery-winner-count').value);
+    const prizeInputs = document.querySelectorAll('.lottery-prize-input');
+    const prizes = Array.from(prizeInputs).map(input => input.value.trim());
+
+    // 验证
+    if (!name) {
+        alert('请补充信息');
+        return;
+    }
+
+    if (prizes.some(p => !p)) {
+        alert('请补充信息');
+        return;
+    }
+
+    if (selectedLotteryPlayers.size === 0) {
+        alert('请补充信息');
+        return;
+    }
+
+    if (selectedLotteryPlayers.size < winnerCount) {
+        alert('玩家名单数不能少于可中奖人数');
+        return;
+    }
+
+    const lotteryData = {
+        id: currentEditingLotteryIndex !== null ? lotteries[currentEditingLotteryIndex].id : Date.now(),
+        name,
+        winnerCount,
+        prizes,
+        playerIds: Array.from(selectedLotteryPlayers),
+        createTime: currentEditingLotteryIndex !== null ? lotteries[currentEditingLotteryIndex].createTime : new Date().toISOString(),
+        winners: currentEditingLotteryIndex !== null ? lotteries[currentEditingLotteryIndex].winners : null
+    };
+
+    if (currentEditingLotteryIndex !== null) {
+        lotteries[currentEditingLotteryIndex] = lotteryData;
+    } else {
+        lotteries.push(lotteryData);
+    }
+
+    saveLotteries();
+    renderLotteryTable();
+    closeLotteryModal();
+}
+
+// 编辑抽奖
+function editLottery(index) {
+    openLotteryModal(index);
+}
+
+// 查看抽奖
+function viewLottery(index) {
+    openLotteryModal(index);
+}
+
+// 删除抽奖
+function deleteLottery(index) {
+    if (confirm('确定删除该抽奖记录吗？')) {
+        lotteries.splice(index, 1);
+        saveLotteries();
+        renderLotteryTable();
+    }
+}
+
+// 执行抽奖
+function drawLottery(index) {
+    const lottery = lotteries[index];
+
+    if (confirm(`确定要为"${lottery.name}"进行抽奖吗？抽奖后将无法修改。`)) {
+        // 随机抽取中奖玩家
+        const shuffled = [...lottery.playerIds].sort(() => Math.random() - 0.5);
+        const winners = shuffled.slice(0, lottery.winnerCount);
+
+        lottery.winners = winners;
+
+        saveLotteries();
+        renderLotteryTable();
+
+        // 显示中奖结果
+        const resultMsg = lottery.prizes.map((prize, idx) =>
+            `${prize}：${winners[idx]}`
+        ).join('\n');
+
+        alert(`抽奖完成！\n\n${resultMsg}`);
+    }
+}
+
+// 设置抽奖相关事件监听
+function setupLotteryEventListeners() {
+    const createBtn = document.getElementById('create-lottery-btn');
+    if (createBtn) {
+        createBtn.addEventListener('click', () => openLotteryModal());
+    }
+
+    const lotteryForm = document.getElementById('lottery-form');
+    if (lotteryForm) {
+        lotteryForm.addEventListener('submit', handleLotterySubmit);
+    }
+
+    const winnerCountSelect = document.getElementById('lottery-winner-count');
+    if (winnerCountSelect) {
+        winnerCountSelect.addEventListener('change', (e) => {
+            updatePrizesInputs(parseInt(e.target.value));
+        });
+    }
+
+    const searchInput = document.getElementById('lottery-player-search');
+    if (searchInput) {
+        searchInput.addEventListener('input', (e) => {
+            renderLotteryPlayerList(e.target.value.trim());
+        });
+    }
 }
