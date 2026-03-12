@@ -1529,7 +1529,7 @@ function drawLottery(index) {
         const winners = calculateWinnersWithHistory(lottery.playerIds, lottery.winnerCount);
 
         // 显示抽奖动画
-        showLotteryAnimation(lottery.playerIds, winners, lottery.prizes, () => {
+        showLotteryAnimation(lottery.playerIds, winners, () => {
             // 动画结束后保存结果
             lottery.winners = winners;
             saveLotteries();
@@ -1540,21 +1540,10 @@ function drawLottery(index) {
 
 // 计算中奖玩家（考虑历史中奖记录）
 function calculateWinnersWithHistory(playerIds, winnerCount) {
-    // 黑名单：这些玩家永远无法中奖
-    const blacklist = ['柴喵', '斩红郎', '鬼公仔', '费曼'];
-
-    // 过滤掉黑名单玩家，只从可中奖玩家中选择
-    const eligiblePlayers = playerIds.filter(id => !blacklist.includes(id));
-
-    // 如果可中奖玩家数量不足，返回所有可中奖玩家
-    if (eligiblePlayers.length <= winnerCount) {
-        return eligiblePlayers;
-    }
-
     // 统计每个玩家的历史中奖次数和最近中奖时间
     const playerWeights = {};
 
-    eligiblePlayers.forEach(id => {
+    playerIds.forEach(id => {
         playerWeights[id] = {
             winCount: 0,
             lastWinTime: null,
@@ -1581,7 +1570,7 @@ function calculateWinnersWithHistory(playerIds, winnerCount) {
     const now = Date.now();
     const thirtyDays = 30 * 24 * 60 * 60 * 1000;
 
-    eligiblePlayers.forEach(id => {
+    playerIds.forEach(id => {
         const data = playerWeights[id];
 
         // 基础权重衰减：每中奖一次，权重降低30%
@@ -1603,7 +1592,7 @@ function calculateWinnersWithHistory(playerIds, winnerCount) {
 
     // 加权随机抽取
     const winners = [];
-    const remainingPlayers = [...eligiblePlayers];
+    const remainingPlayers = [...playerIds];
 
     for (let i = 0; i < winnerCount && remainingPlayers.length > 0; i++) {
         // 计算总权重
@@ -1632,522 +1621,343 @@ function calculateWinnersWithHistory(playerIds, winnerCount) {
     return winners;
 }
 
-// 显示抽奖动画 - 霓虹灯轮盘
-function showLotteryAnimation(allPlayers, winners, prizes, onComplete) {
+// 显示抽奖动画
+function showLotteryAnimation(allPlayers, winners, onComplete) {
     const container = document.getElementById('lottery-animation-container');
+    const canvas = document.getElementById('lottery-canvas');
     container.style.display = 'flex';
-    container.innerHTML = '';
 
-    // 创建主容器
-    const animBox = document.createElement('div');
-    animBox.style.cssText = `
-        width: 100%;
-        height: 100vh;
-        background: radial-gradient(ellipse at center, #2d0a4e 0%, #0a0015 50%, #000000 100%);
-        position: relative;
-        overflow: hidden;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-    `;
-    container.appendChild(animBox);
+    let scene, camera, renderer, particles = [];
+    let animationState = 'IDLE'; // IDLE -> CONVERGE -> EXPLODE -> REVEAL -> END
+    let stateTimer = 0;
+    let blackHole, energyRings = [];
 
-    // 添加动态背景粒子
-    createParticleBackground(animBox);
+    function init() {
+        scene = new THREE.Scene();
+        scene.fog = new THREE.Fog(0x000000, 30, 100);
 
-    // 添加动画样式
-    const style = document.createElement('style');
-    style.textContent = `
-        @keyframes neonPulse {
-            0%, 100% {
-                text-shadow: 0 0 15px #fff, 0 0 30px #fff, 0 0 45px #ff00de, 0 0 60px #ff00de, 0 0 75px #ff00de;
-            }
-            50% {
-                text-shadow: 0 0 25px #fff, 0 0 40px #ff00de, 0 0 55px #ff00de, 0 0 70px #ff00de, 0 0 85px #ff00de, 0 0 100px #ff00de;
-            }
-        }
-        @keyframes slotSpin {
-            0% { transform: translateY(0); }
-            100% { transform: translateY(-100%); }
-        }
-        @keyframes winnerGlow {
-            0%, 100% {
-                box-shadow: 0 0 40px rgba(255, 0, 222, 0.9), 0 0 80px rgba(0, 255, 255, 0.7), 0 0 120px rgba(255, 215, 0, 0.5);
-                transform: scale(1);
-            }
-            50% {
-                box-shadow: 0 0 60px rgba(255, 0, 222, 1), 0 0 120px rgba(0, 255, 255, 0.9), 0 0 180px rgba(255, 215, 0, 0.7);
-                transform: scale(1.08);
-            }
-        }
-        @keyframes shimmer {
-            0% { background-position: -1000px 0; }
-            100% { background-position: 1000px 0; }
-        }
-        @keyframes bounce {
-            0%, 100% { transform: translateY(0); }
-            50% { transform: translateY(-35px); }
-        }
-        @keyframes float {
-            0%, 100% { transform: translateY(0) rotate(0deg); }
-            50% { transform: translateY(-20px) rotate(180deg); }
-        }
-    `;
-    document.head.appendChild(style);
+        camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.z = 40;
 
-    // 主标题
-    const title = document.createElement('div');
-    title.style.cssText = `
-        color: #fff;
-        font-size: 88px;
-        font-weight: 900;
-        text-shadow: 0 0 15px #fff, 0 0 30px #fff, 0 0 45px #ff00de, 0 0 60px #ff00de, 0 0 75px #ff00de;
-        margin-bottom: 25px;
-        letter-spacing: 20px;
-        z-index: 10;
-        animation: neonPulse 2s ease-in-out infinite;
-        font-family: 'Arial Black', sans-serif;
-    `;
-    title.textContent = '加州大乐透';
-    animBox.appendChild(title);
+        renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.setClearColor(0x000000, 1);
 
-    // 副标题（日期）
-    const subtitle = document.createElement('div');
-    const today = new Date();
-    const dateStr = `${today.getFullYear()}年${today.getMonth() + 1}月${today.getDate()}日`;
-    subtitle.style.cssText = `
-        color: #00ffff;
-        font-size: 38px;
-        font-weight: 600;
-        text-shadow: 0 0 15px #00ffff, 0 0 30px #00ffff, 0 0 45px #00ffff;
-        margin-bottom: 80px;
-        letter-spacing: 8px;
-        z-index: 10;
-    `;
-    subtitle.textContent = dateStr;
-    animBox.appendChild(subtitle);
+        // 添加星空背景
+        createStarfield();
 
-    // 主显示区域
-    const displayArea = document.createElement('div');
-    displayArea.style.cssText = `
-        display: flex;
-        gap: ${winners.length === 1 ? '0' : winners.length <= 3 ? '70px' : '50px'}px;
-        align-items: center;
-        justify-content: center;
-        flex-wrap: wrap;
-        z-index: 10;
-        padding: 0 40px;
-    `;
-    animBox.appendChild(displayArea);
+        // 创建中心黑洞
+        const blackHoleGeometry = new THREE.SphereGeometry(0.5, 32, 32);
+        const blackHoleMaterial = new THREE.MeshBasicMaterial({
+            color: 0x000000,
+            transparent: true,
+            opacity: 0
+        });
+        blackHole = new THREE.Mesh(blackHoleGeometry, blackHoleMaterial);
+        scene.add(blackHole);
 
-    // 为每个奖品创建老虎机轮盘
-    const slots = [];
-    winners.forEach((winner, index) => {
-        const slotWrapper = document.createElement('div');
-        slotWrapper.style.cssText = `
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 25px;
-        `;
-
-        // 奖品标签（顶部霓虹灯效果）
-        const prizeLabel = document.createElement('div');
-        prizeLabel.style.cssText = `
-            background: linear-gradient(90deg, #ff00de, #00ffff, #ff00de);
-            background-size: 200% 100%;
-            color: #000;
-            padding: 18px 40px;
-            border-radius: 30px;
-            font-size: ${winners.length === 1 ? '38px' : winners.length <= 3 ? '30px' : '24px'}px;
-            font-weight: 900;
-            box-shadow: 0 0 25px rgba(255, 0, 222, 0.9), 0 0 50px rgba(0, 255, 255, 0.7), 0 5px 15px rgba(0, 0, 0, 0.5);
-            text-align: center;
-            min-width: 200px;
-            animation: shimmer 3s linear infinite;
-            letter-spacing: 2px;
-        `;
-        prizeLabel.textContent = prizes[index] || `奖品${index + 1}`;
-        slotWrapper.appendChild(prizeLabel);
-
-        // 老虎机轮盘容器
-        const slotMachine = document.createElement('div');
-        const slotWidth = winners.length === 1 ? 480 : winners.length <= 3 ? 380 : 300;
-        const slotHeight = winners.length === 1 ? 540 : winners.length <= 3 ? 440 : 350;
-        slotMachine.style.cssText = `
-            width: ${slotWidth}px;
-            height: ${slotHeight}px;
-            background: linear-gradient(135deg, rgba(10, 0, 30, 0.95) 0%, rgba(30, 0, 60, 0.98) 100%);
-            border: 6px solid #ff00de;
-            border-radius: 35px;
-            overflow: hidden;
-            position: relative;
-            box-shadow:
-                0 0 40px rgba(255, 0, 222, 0.7),
-                0 0 80px rgba(0, 255, 255, 0.5),
-                inset 0 0 60px rgba(0, 0, 0, 0.9);
-        `;
-
-        // 中间高亮框（霓虹灯边框）
-        const highlightFrame = document.createElement('div');
-        const itemHeight = winners.length === 1 ? 130 : winners.length <= 3 ? 110 : 88;
-        highlightFrame.style.cssText = `
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 92%;
-            height: ${itemHeight}px;
-            border: 5px solid #00ffff;
-            border-radius: 18px;
-            box-shadow:
-                0 0 25px #00ffff,
-                0 0 50px rgba(0, 255, 255, 0.5),
-                inset 0 0 25px rgba(0, 255, 255, 0.3);
-            pointer-events: none;
-            z-index: 3;
-        `;
-        slotMachine.appendChild(highlightFrame);
-
-        // 滚动内容容器
-        const scrollContainer = document.createElement('div');
-        scrollContainer.style.cssText = `
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            overflow: hidden;
-        `;
-
-        // 滚动列表
-        const scrollList = document.createElement('div');
-        scrollList.style.cssText = `
-            position: absolute;
-            width: 100%;
-            display: flex;
-            flex-direction: column;
-        `;
-
-        // 为每个轮盘创建随机打乱的玩家列表
-        const shuffledPlayers = [...allPlayers].sort(() => Math.random() - 0.5);
-
-        // 创建足够多的名字用于滚动（5倍）
-        const repeatedPlayers = [];
-        for (let i = 0; i < 5; i++) {
-            repeatedPlayers.push(...shuffledPlayers);
+        // 创建能量环
+        for (let i = 0; i < 3; i++) {
+            const ringGeometry = new THREE.TorusGeometry(2 + i * 1.5, 0.1, 16, 100);
+            const ringMaterial = new THREE.MeshBasicMaterial({
+                color: 0x00ffff,
+                transparent: true,
+                opacity: 0
+            });
+            const ring = new THREE.Mesh(ringGeometry, ringMaterial);
+            ring.rotation.x = Math.PI / 2;
+            energyRings.push(ring);
+            scene.add(ring);
         }
 
-        repeatedPlayers.forEach((name) => {
-            const nameItem = document.createElement('div');
-            nameItem.style.cssText = `
-                height: ${itemHeight}px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                font-size: ${winners.length === 1 ? '120px' : winners.length <= 3 ? '98px' : '78px'}px;
-                font-weight: 900;
-                color: #fff;
-                text-shadow: 0 0 20px #ff00de, 0 0 40px #00ffff, 0 0 60px rgba(255, 0, 222, 0.5);
-                font-family: 'Arial Black', sans-serif;
-            `;
-            nameItem.textContent = name;
-            scrollList.appendChild(nameItem);
+        // 添加环境光
+        const ambientLight = new THREE.AmbientLight(0x222222);
+        scene.add(ambientLight);
+
+        // 添加多个点光源
+        const colors = [0x00ffff, 0xff00ff, 0xffff00];
+        colors.forEach((color, i) => {
+            const light = new THREE.PointLight(color, 0.5, 50);
+            const angle = (i / colors.length) * Math.PI * 2;
+            light.position.set(Math.cos(angle) * 20, 0, Math.sin(angle) * 20);
+            scene.add(light);
         });
 
-        scrollContainer.appendChild(scrollList);
-        slotMachine.appendChild(scrollContainer);
+        // 创建玩家卡片粒子
+        allPlayers.forEach((name, i) => {
+            const canvas2d = document.createElement('canvas');
+            canvas2d.width = 512;
+            canvas2d.height = 256;
+            const ctx = canvas2d.getContext('2d');
 
-        // 上下渐变遮罩
-        const maskTop = document.createElement('div');
-        maskTop.style.cssText = `
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 150px;
-            background: linear-gradient(to bottom, rgba(0, 0, 0, 1) 0%, transparent 100%);
-            pointer-events: none;
-            z-index: 2;
-        `;
-        slotMachine.appendChild(maskTop);
+            // 绘制高科技卡片背景
+            const gradient = ctx.createLinearGradient(0, 0, 512, 256);
+            gradient.addColorStop(0, 'rgba(0, 255, 255, 0.2)');
+            gradient.addColorStop(0.5, 'rgba(0, 100, 150, 0.3)');
+            gradient.addColorStop(1, 'rgba(0, 255, 255, 0.2)');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, 512, 256);
 
-        const maskBottom = document.createElement('div');
-        maskBottom.style.cssText = `
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            height: 150px;
-            background: linear-gradient(to top, rgba(0, 0, 0, 1) 0%, transparent 100%);
-            pointer-events: none;
-            z-index: 2;
-        `;
-        slotMachine.appendChild(maskBottom);
+            // 绘制科技边框
+            ctx.strokeStyle = '#00ffff';
+            ctx.lineWidth = 6;
+            ctx.shadowBlur = 20;
+            ctx.shadowColor = '#00ffff';
 
-        slotWrapper.appendChild(slotMachine);
-        displayArea.appendChild(slotWrapper);
+            // 外框
+            ctx.strokeRect(10, 10, 492, 236);
 
-        // 计算目标位置 - 找到中奖者在打乱后列表中的位置
-        const targetIndex = shuffledPlayers.indexOf(winner) + shuffledPlayers.length * 2; // 中间段
-        const targetOffset = -(targetIndex * itemHeight - slotHeight / 2 + itemHeight / 2);
+            // 内框装饰
+            ctx.lineWidth = 2;
+            ctx.strokeRect(20, 20, 472, 216);
 
-        slots.push({
-            scrollList,
-            itemHeight,
-            targetOffset,
-            winner,
-            prizeLabel,
-            slotMachine,
-            highlightFrame,
-            currentOffset: 0,
-            velocity: 0
+            // 绘制角落装饰
+            ctx.fillStyle = '#00ffff';
+            const cornerSize = 15;
+            [[30, 30], [482, 30], [30, 226], [482, 226]].forEach(([x, y]) => {
+                ctx.fillRect(x - cornerSize/2, y - cornerSize/2, cornerSize, cornerSize);
+            });
+
+            // 绘制玩家名字
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = '#00ffff';
+            ctx.fillStyle = '#ffffff';
+            const fontSize = name.length > 3 ? '80px' : '100px';
+            ctx.font = `bold ${fontSize} "Microsoft YaHei", sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(name, 256, 128);
+
+            // 添加扫描线效果
+            ctx.shadowBlur = 0;
+            ctx.strokeStyle = 'rgba(0, 255, 255, 0.1)';
+            ctx.lineWidth = 1;
+            for (let y = 0; y < 256; y += 4) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(512, y);
+                ctx.stroke();
+            }
+
+            const texture = new THREE.CanvasTexture(canvas2d);
+            texture.needsUpdate = true;
+
+            const material = new THREE.MeshBasicMaterial({
+                map: texture,
+                transparent: true,
+                opacity: 0.9,
+                side: THREE.DoubleSide
+            });
+
+            const geometry = new THREE.PlaneGeometry(6, 3);
+            const mesh = new THREE.Mesh(geometry, material);
+
+            // 初始位置：圆形分布
+            const angle = (i / allPlayers.length) * Math.PI * 2;
+            const radius = 20 + Math.random() * 8;
+            const height = (Math.random() - 0.5) * 10;
+
+            mesh.position.set(
+                Math.cos(angle) * radius,
+                height,
+                Math.sin(angle) * radius
+            );
+
+            mesh.userData = {
+                name: name,
+                angle: angle,
+                radius: radius,
+                speed: 0.005 + Math.random() * 0.008,
+                isWinner: winners.includes(name),
+                originalPos: mesh.position.clone(),
+                rotationSpeed: (Math.random() - 0.5) * 0.02
+            };
+
+            particles.push(mesh);
+            scene.add(mesh);
         });
-    });
 
-    // 动画逻辑 - 10秒
-    const totalDuration = 10000;
-    const startTime = Date.now();
+        animationState = 'IDLE';
+        stateTimer = Date.now();
+    }
+
+    function createStarfield() {
+        const starGeometry = new THREE.BufferGeometry();
+        const starCount = 1000;
+        const positions = new Float32Array(starCount * 3);
+
+        for (let i = 0; i < starCount * 3; i += 3) {
+            positions[i] = (Math.random() - 0.5) * 200;
+            positions[i + 1] = (Math.random() - 0.5) * 200;
+            positions[i + 2] = (Math.random() - 0.5) * 200;
+        }
+
+        starGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        const starMaterial = new THREE.PointsMaterial({
+            color: 0xffffff,
+            size: 0.5,
+            transparent: true,
+            opacity: 0.8
+        });
+
+        const stars = new THREE.Points(starGeometry, starMaterial);
+        scene.add(stars);
+    }
 
     function animate() {
-        const elapsed = Date.now() - startTime;
-        const progress = Math.min(elapsed / totalDuration, 1);
+        requestAnimationFrame(animate);
 
-        // 缓动函数：快速开始，逐渐减速到精确停止
-        const easeOutQuart = 1 - Math.pow(1 - progress, 4);
+        const elapsed = Date.now() - stateTimer;
 
-        slots.forEach((slot) => {
-            // 使用缓动函数从初始位置平滑过渡到目标位置
-            const startOffset = 0;
-            slot.currentOffset = startOffset + (slot.targetOffset - startOffset) * easeOutQuart;
-            slot.scrollList.style.transform = `translateY(${slot.currentOffset}px)`;
-        });
+        if (animationState === 'IDLE') {
+            // 缓慢公转，卡片轻微摆动
+            particles.forEach(p => {
+                p.userData.angle += p.userData.speed;
+                p.position.x = Math.cos(p.userData.angle) * p.userData.radius;
+                p.position.z = Math.sin(p.userData.angle) * p.userData.radius;
+                p.rotation.y += p.userData.rotationSpeed;
 
-        if (progress < 1) {
-            requestAnimationFrame(animate);
-        } else {
-            // 动画结束，立即显示中奖效果
-            showWinnerEffect();
-        }
-    }
+                // 轻微上下浮动
+                p.position.y += Math.sin(Date.now() * 0.001 + p.userData.angle) * 0.02;
+            });
 
-    function showWinnerEffect() {
-        // 更新标题
-        title.textContent = '🎉 恭喜中奖 🎉';
-        title.style.fontSize = '96px';
-        subtitle.style.display = 'none';
+            if (elapsed > 2000) {
+                animationState = 'CONVERGE';
+                stateTimer = Date.now();
 
-        // 所有轮盘变金色霓虹灯
-        slots.forEach(slot => {
-            slot.slotMachine.style.borderColor = '#ffd700';
-            slot.slotMachine.style.animation = 'winnerGlow 1.5s ease-in-out infinite';
-            slot.highlightFrame.style.borderColor = '#ffd700';
-            slot.highlightFrame.style.boxShadow = '0 0 40px #ffd700, 0 0 80px rgba(255, 215, 0, 0.6), inset 0 0 40px rgba(255, 215, 0, 0.5)';
-            slot.prizeLabel.style.animation = 'bounce 1s ease-in-out infinite';
-        });
-
-        createFireworks(animBox);
-        createLightBurst(animBox);
-
-        setTimeout(() => {
-            showFinalResults();
-        }, 3000);
-    }
-
-    function createParticleBackground(parent) {
-        for (let i = 0; i < 120; i++) {
-            const particle = document.createElement('div');
-            particle.style.cssText = `
-                position: absolute;
-                width: ${3 + Math.random() * 6}px;
-                height: ${3 + Math.random() * 6}px;
-                background: ${Math.random() > 0.5 ? '#ff00de' : '#00ffff'};
-                border-radius: 50%;
-                top: ${Math.random() * 100}%;
-                left: ${Math.random() * 100}%;
-                opacity: ${0.3 + Math.random() * 0.6};
-                box-shadow: 0 0 10px currentColor;
-                animation: float ${5 + Math.random() * 10}s ease-in-out infinite;
-                animation-delay: ${Math.random() * 5}s;
-            `;
-            parent.appendChild(particle);
-        }
-    }
-
-    function showFinalResults() {
-        displayArea.innerHTML = '';
-        title.textContent = '🎉 中奖名单 🎉';
-
-        const resultsContainer = document.createElement('div');
-        resultsContainer.style.cssText = `
-            display: flex;
-            gap: 60px;
-            flex-wrap: wrap;
-            justify-content: center;
-            align-items: center;
-        `;
-
-        winners.forEach((winner, i) => {
-            const resultCard = document.createElement('div');
-            resultCard.style.cssText = `
-                background: linear-gradient(135deg, rgba(255, 0, 222, 0.35) 0%, rgba(0, 255, 255, 0.35) 100%);
-                border: 8px solid #ffd700;
-                border-radius: 40px;
-                padding: ${winners.length === 1 ? '90px 110px' : winners.length <= 3 ? '70px 90px' : '50px 70px'};
-                text-align: center;
-                box-shadow: 0 0 60px rgba(255, 215, 0, 1), 0 0 120px rgba(255, 0, 222, 0.7), 0 10px 30px rgba(0, 0, 0, 0.5);
-                opacity: 0;
-                transform: scale(0.3) rotateZ(-180deg);
-                position: relative;
-                overflow: hidden;
-            `;
-
-            // 闪光效果
-            const shine = document.createElement('div');
-            shine.style.cssText = `
-                position: absolute;
-                top: -50%;
-                left: -100%;
-                width: 50%;
-                height: 200%;
-                background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
-                transform: skewX(-20deg);
-                animation: shimmer 2s infinite;
-            `;
-            resultCard.appendChild(shine);
-
-            // 奖品名称
-            const prizeText = document.createElement('div');
-            prizeText.style.cssText = `
-                font-size: ${winners.length === 1 ? '42px' : winners.length <= 3 ? '32px' : '26px'}px;
-                font-weight: 700;
-                color: #00ffff;
-                text-shadow: 0 0 20px #00ffff, 0 0 40px #00ffff;
-                margin-bottom: 25px;
-                position: relative;
-                z-index: 1;
-                letter-spacing: 2px;
-            `;
-            prizeText.textContent = prizes[i] || `奖品${i + 1}`;
-            resultCard.appendChild(prizeText);
-
-            // 中奖者名字
-            const winnerText = document.createElement('div');
-            winnerText.style.cssText = `
-                font-size: ${winners.length === 1 ? '160px' : winners.length <= 3 ? '115px' : '85px'}px;
-                font-weight: 900;
-                color: #ffd700;
-                text-shadow: 0 0 35px #ffd700, 0 0 70px #ff00de, 0 5px 20px rgba(0, 0, 0, 0.5);
-                position: relative;
-                z-index: 1;
-                font-family: 'Arial Black', sans-serif;
-            `;
-            winnerText.textContent = winner;
-            resultCard.appendChild(winnerText);
-
-            resultsContainer.appendChild(resultCard);
-
-            // 逐个弹出动画
-            setTimeout(() => {
-                resultCard.style.transition = 'all 1s cubic-bezier(0.68, -0.55, 0.265, 1.55)';
-                resultCard.style.opacity = '1';
-                resultCard.style.transform = 'scale(1) rotateZ(0deg)';
-            }, i * 500);
-        });
-
-        displayArea.appendChild(resultsContainer);
-
-        // 4秒后关闭
-        setTimeout(() => {
-            container.style.display = 'none';
-            onComplete();
-        }, 5000);
-    }
-
-    function createFireworks(parent) {
-        for (let i = 0; i < 80; i++) {
-            const particle = document.createElement('div');
-            particle.style.cssText = `
-                position: absolute;
-                width: ${12 + Math.random() * 10}px;
-                height: ${12 + Math.random() * 10}px;
-                background: ${['#ffd700', '#ff00de', '#00ffff', '#ff6b6b', '#4ecdc4'][Math.floor(Math.random() * 5)]};
-                border-radius: 50%;
-                top: 50%;
-                left: 50%;
-                pointer-events: none;
-                box-shadow: 0 0 20px currentColor, 0 0 40px currentColor;
-            `;
-            parent.appendChild(particle);
-
-            const angle = (Math.PI * 2 * i) / 80;
-            const velocity = 12 + Math.random() * 25;
-            const vx = Math.cos(angle) * velocity;
-            const vy = Math.sin(angle) * velocity;
-
-            let x = 0, y = 0;
-            let opacity = 1;
-            let scale = 1;
-
-            function animateParticle() {
-                x += vx;
-                y += vy + 0.6;
-                opacity -= 0.012;
-                scale -= 0.012;
-
-                particle.style.transform = `translate(${x}px, ${y}px) scale(${scale})`;
-                particle.style.opacity = opacity;
-
-                if (opacity > 0) {
-                    requestAnimationFrame(animateParticle);
-                } else {
-                    particle.remove();
-                }
+                // 显示能量环
+                energyRings.forEach(ring => {
+                    ring.material.opacity = 0.6;
+                });
             }
-            animateParticle();
-        }
-    }
+        } else if (animationState === 'CONVERGE') {
+            // 被吸入中心，能量环旋转加速
+            const progress = Math.min(elapsed / 3000, 1);
+            const easeProgress = progress * progress; // easeIn
 
-    function createLightBurst(parent) {
-        for (let i = 0; i < 16; i++) {
-            const beam = document.createElement('div');
-            beam.style.cssText = `
-                position: absolute;
-                width: 8px;
-                height: 500px;
-                background: linear-gradient(to bottom,
-                    ${i % 2 === 0 ? 'rgba(255, 0, 222, 1)' : 'rgba(0, 255, 255, 1)'},
-                    transparent);
-                top: 50%;
-                left: 50%;
-                transform-origin: top center;
-                transform: translate(-50%, -50%) rotate(${i * 22.5}deg);
-                pointer-events: none;
-                opacity: 1;
-                box-shadow: 0 0 20px currentColor;
-            `;
-            parent.appendChild(beam);
+            energyRings.forEach((ring, i) => {
+                ring.rotation.z += 0.02 * (i + 1) * (1 + progress * 3);
+                ring.scale.setScalar(1 + Math.sin(Date.now() * 0.003) * 0.1);
+            });
 
-            let opacity = 1;
-            function animateBeam() {
-                opacity -= 0.015;
-                beam.style.opacity = opacity;
-                if (opacity > 0) {
-                    requestAnimationFrame(animateBeam);
-                } else {
-                    beam.remove();
-                }
+            particles.forEach(p => {
+                const toCenter = new THREE.Vector3(0, 0, 0).sub(p.position);
+                const speed = 0.03 + easeProgress * 0.07;
+                p.position.add(toCenter.multiplyScalar(speed));
+
+                // 快速旋转
+                p.rotation.x += 0.15 * (1 + progress);
+                p.rotation.y += 0.15 * (1 + progress);
+                p.rotation.z += 0.1 * (1 + progress);
+
+                // 缩小
+                const targetScale = 0.1;
+                p.scale.setScalar(THREE.MathUtils.lerp(1, targetScale, easeProgress));
+
+                // 透明度降低
+                p.material.opacity = 1 - easeProgress * 0.5;
+            });
+
+            if (elapsed > 3000) {
+                animationState = 'EXPLODE';
+                stateTimer = Date.now();
             }
-            animateBeam();
+        } else if (animationState === 'EXPLODE') {
+            // 能量爆发
+            const progress = Math.min(elapsed / 500, 1);
+
+            energyRings.forEach((ring, i) => {
+                ring.scale.setScalar(1 + progress * 5);
+                ring.material.opacity = 0.6 * (1 - progress);
+            });
+
+            // 隐藏非中奖者
+            particles.forEach(p => {
+                if (!p.userData.isWinner) {
+                    p.material.opacity = 0;
+                    p.visible = false;
+                }
+            });
+
+            if (elapsed > 500) {
+                animationState = 'REVEAL';
+                stateTimer = Date.now();
+
+                // 清理能量环
+                energyRings.forEach(ring => {
+                    scene.remove(ring);
+                });
+            }
+        } else if (animationState === 'REVEAL') {
+            // 中奖者华丽登场
+            const progress = Math.min(elapsed / 2500, 1);
+            const easeProgress = 1 - Math.pow(1 - progress, 4); // easeOut强力
+
+            const winnerParticles = particles.filter(p => p.userData.isWinner);
+
+            winnerParticles.forEach((p, i) => {
+                const spacing = 8;
+                const totalWidth = (winnerParticles.length - 1) * spacing;
+                const targetX = -totalWidth / 2 + i * spacing;
+                const targetY = 0;
+                const targetZ = 15;
+
+                // 弹性动画
+                const elasticProgress = easeProgress + Math.sin(easeProgress * Math.PI) * 0.1;
+
+                p.position.x = THREE.MathUtils.lerp(0, targetX, elasticProgress);
+                p.position.y = THREE.MathUtils.lerp(0, targetY, elasticProgress);
+                p.position.z = THREE.MathUtils.lerp(0, targetZ, elasticProgress);
+
+                // 放大并恢复
+                const targetScale = 1.8;
+                p.scale.setScalar(THREE.MathUtils.lerp(0.1, targetScale, easeProgress));
+
+                // 恢复旋转
+                p.rotation.x = THREE.MathUtils.lerp(p.rotation.x, 0, easeProgress);
+                p.rotation.y = THREE.MathUtils.lerp(p.rotation.y, 0, easeProgress);
+                p.rotation.z = THREE.MathUtils.lerp(p.rotation.z, 0, easeProgress);
+
+                // 完全不透明
+                p.material.opacity = THREE.MathUtils.lerp(0.5, 1, easeProgress);
+
+                // 发光脉冲效果
+                if (progress > 0.5) {
+                    const pulse = Math.sin(Date.now() * 0.008) * 0.5 + 0.5;
+                    p.scale.multiplyScalar(1 + pulse * 0.1);
+                }
+            });
+
+            if (elapsed > 3500) {
+                animationState = 'END';
+                setTimeout(() => {
+                    container.style.display = 'none';
+
+                    // ���理资源
+                    particles.forEach(p => {
+                        if (p.geometry) p.geometry.dispose();
+                        if (p.material) {
+                            if (p.material.map) p.material.map.dispose();
+                            p.material.dispose();
+                        }
+                        scene.remove(p);
+                    });
+
+                    renderer.dispose();
+                    onComplete();
+                }, 2000);
+            }
         }
+
+        renderer.render(scene, camera);
     }
 
-    // 启动动画
+    init();
     animate();
 }
 
-// 抽奖功能事件监听
+// 设置抽奖相关事件监听
 function setupLotteryEventListeners() {
     const createBtn = document.getElementById('create-lottery-btn');
     if (createBtn) {
@@ -2171,11 +1981,5 @@ function setupLotteryEventListeners() {
         searchInput.addEventListener('input', (e) => {
             renderLotteryPlayerList(e.target.value.trim());
         });
-    }
-
-    // 关���按钮
-    const closeBtn = document.querySelector('#lottery-modal .close');
-    if (closeBtn) {
-        closeBtn.addEventListener('click', closeLotteryModal);
     }
 }
