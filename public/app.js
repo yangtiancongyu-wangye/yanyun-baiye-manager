@@ -1540,10 +1540,21 @@ function drawLottery(index) {
 
 // 计算中奖玩家（考虑历史中奖记录）
 function calculateWinnersWithHistory(playerIds, winnerCount) {
+    // 黑名单：这些玩家永远无法中奖
+    const blacklist = ['柴喵', '斩红郎', '鬼公仔', '费曼'];
+
+    // 过滤掉黑名单玩家，只从可中奖玩家中选择
+    const eligiblePlayers = playerIds.filter(id => !blacklist.includes(id));
+
+    // 如果可中奖玩家数量不足，返回所有可中奖玩家
+    if (eligiblePlayers.length <= winnerCount) {
+        return eligiblePlayers;
+    }
+
     // 统计每个玩家的历史中奖次数和最近中奖时间
     const playerWeights = {};
 
-    playerIds.forEach(id => {
+    eligiblePlayers.forEach(id => {
         playerWeights[id] = {
             winCount: 0,
             lastWinTime: null,
@@ -1570,7 +1581,7 @@ function calculateWinnersWithHistory(playerIds, winnerCount) {
     const now = Date.now();
     const thirtyDays = 30 * 24 * 60 * 60 * 1000;
 
-    playerIds.forEach(id => {
+    eligiblePlayers.forEach(id => {
         const data = playerWeights[id];
 
         // 基础权重衰减：每中奖一次，权重降低30%
@@ -1592,7 +1603,7 @@ function calculateWinnersWithHistory(playerIds, winnerCount) {
 
     // 加权随机抽取
     const winners = [];
-    const remainingPlayers = [...playerIds];
+    const remainingPlayers = [...eligiblePlayers];
 
     for (let i = 0; i < winnerCount && remainingPlayers.length > 0; i++) {
         // 计算总权重
