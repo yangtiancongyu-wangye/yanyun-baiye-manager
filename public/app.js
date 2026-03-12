@@ -1374,7 +1374,7 @@ function renderLotteryPlayerList(searchTerm = '') {
         const isSelected = selectedLotteryPlayers.has(player.id);
         const item = document.createElement('div');
         item.style.cssText = `
-            padding: 8px;
+            padding: 10px;
             border-bottom: 1px solid #eee;
             display: flex;
             align-items: center;
@@ -1387,11 +1387,31 @@ function renderLotteryPlayerList(searchTerm = '') {
         checkbox.style.marginRight = '10px';
 
         const label = document.createElement('label');
-        label.style.cssText = 'flex: 1; cursor: pointer;';
-        label.textContent = player.id;
+        label.style.cssText = 'flex: 1; cursor: pointer; display: flex; justify-content: space-between;';
+        label.innerHTML = `
+            <span style="font-weight: bold;">${player.id}</span>
+            <span style="color: #666; font-size: 14px;">${player.professions.join('、')}</span>
+        `;
 
-        item.onclick = () => {
+        // 点击整行切换checkbox和状态
+        item.onclick = (e) => {
+            e.stopPropagation();
             checkbox.checked = !checkbox.checked;
+
+            // 更新全局状态
+            if (checkbox.checked) {
+                selectedLotteryPlayers.add(player.id);
+            } else {
+                selectedLotteryPlayers.delete(player.id);
+            }
+            updateLotterySelectedPreview();
+        };
+
+        // 点击checkbox本身也更新状态
+        checkbox.onclick = (e) => {
+            e.stopPropagation();
+
+            // 更新全局状态
             if (checkbox.checked) {
                 selectedLotteryPlayers.add(player.id);
             } else {
@@ -1505,25 +1525,604 @@ function drawLottery(index) {
     const lottery = lotteries[index];
 
     if (confirm(`确定要为"${lottery.name}"进行抽奖吗？抽奖后将无法修改。`)) {
-        // 随机抽取中奖玩家
-        const shuffled = [...lottery.playerIds].sort(() => Math.random() - 0.5);
-        const winners = shuffled.slice(0, lottery.winnerCount);
+        // 计算中奖玩家（考虑历史中奖记录）
+        const winners = calculateWinnersWithHistory(lottery.playerIds, lottery.winnerCount);
 
-        lottery.winners = winners;
-
-        saveLotteries();
-        renderLotteryTable();
-
-        // 显示中奖结果
-        const resultMsg = lottery.prizes.map((prize, idx) =>
-            `${prize}：${winners[idx]}`
-        ).join('\n');
-
-        alert(`抽奖完成！\n\n${resultMsg}`);
+        // 显示抽奖动画
+        showLotteryAnimation(lottery.playerIds, winners, lottery.prizes, () => {
+            // 动画结束后保存结果
+            lottery.winners = winners;
+            saveLotteries();
+            renderLotteryTable();
+        });
     }
 }
 
-// 设置抽奖相关事件监听
+// 计算中奖玩家（考虑历史中奖记录）
+function calculateWinnersWithHistory(playerIds, winnerCount) {
+    // 统计每个玩家的历史中奖次数和最近中奖时间
+    const playerWeights = {};
+
+    playerIds.forEach(id => {
+        playerWeights[id] = {
+            winCount: 0,
+            lastWinTime: null,
+            weight: 1.0
+        };
+    });
+
+    // 遍历所有历史抽奖记录
+    lotteries.forEach(lot => {
+        if (lot.winners && lot.winners.length > 0) {
+            lot.winners.forEach(winnerId => {
+                if (playerWeights[winnerId]) {
+                    playerWeights[winnerId].winCount++;
+                    const winTime = new Date(lot.createTime).getTime();
+                    if (!playerWeights[winnerId].lastWinTime || winTime > playerWeights[winnerId].lastWinTime) {
+                        playerWeights[winnerId].lastWinTime = winTime;
+                    }
+                }
+            });
+        }
+    });
+
+    // 计算权重：中奖次数越多、距离上次中奖时间越近，权重越低
+    const now = Date.now();
+    const thirtyDays = 30 * 24 * 60 * 60 * 1000;
+
+    playerIds.forEach(id => {
+        const data = playerWeights[id];
+
+        // 基础权重衰减：每中奖一次，权重降低30%
+        data.weight *= Math.pow(0.7, data.winCount);
+
+        // 时间衰减：如果30天内中过奖，额外降低权重
+        if (data.lastWinTime) {
+            const daysSinceWin = (now - data.lastWinTime) / (24 * 60 * 60 * 1000);
+            if (daysSinceWin < 30) {
+                // 30天内中奖，权重额外降低 (1 - daysSinceWin/30) * 50%
+                const timePenalty = (1 - daysSinceWin / 30) * 0.5;
+                data.weight *= (1 - timePenalty);
+            }
+        }
+
+        // 确保权重不为0
+        data.weight = Math.max(data.weight, 0.1);
+    });
+
+    // 加权随机抽取
+    const winners = [];
+    const remainingPlayers = [...playerIds];
+
+    for (let i = 0; i < winnerCount && remainingPlayers.length > 0; i++) {
+        // 计算总权重
+        const totalWeight = remainingPlayers.reduce((sum, id) => sum + playerWeights[id].weight, 0);
+
+        // 随机选择
+        let random = Math.random() * totalWeight;
+        let selectedId = null;
+
+        for (const id of remainingPlayers) {
+            random -= playerWeights[id].weight;
+            if (random <= 0) {
+                selectedId = id;
+                break;
+            }
+        }
+
+        if (!selectedId) {
+            selectedId = remainingPlayers[remainingPlayers.length - 1];
+        }
+
+        winners.push(selectedId);
+        remainingPlayers.splice(remainingPlayers.indexOf(selectedId), 1);
+    }
+
+    return winners;
+}
+
+// 显示抽奖动画 - 霓虹灯轮盘
+function showLotteryAnimation(allPlayers, winners, prizes, onComplete) {
+    const container = document.getElementById('lottery-animation-container');
+    container.style.display = 'flex';
+    container.innerHTML = '';
+
+    // 创建主容器
+    const animBox = document.createElement('div');
+    animBox.style.cssText = `
+        width: 100%;
+        height: 100vh;
+        background: linear-gradient(135deg, #1a0033 0%, #000000 50%, #330033 100%);
+        position: relative;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+    `;
+    container.appendChild(animBox);
+
+    // 添加动态背景粒子
+    createParticleBackground(animBox);
+
+    // 添加动画样式
+    const style = document.createElement('style');
+    style.textContent = `
+        @keyframes neonPulse {
+            0%, 100% {
+                text-shadow: 0 0 10px #fff, 0 0 20px #fff, 0 0 30px #ff00de, 0 0 40px #ff00de;
+            }
+            50% {
+                text-shadow: 0 0 20px #fff, 0 0 30px #ff00de, 0 0 40px #ff00de, 0 0 50px #ff00de, 0 0 60px #ff00de;
+            }
+        }
+        @keyframes slotSpin {
+            0% { transform: translateY(0); }
+            100% { transform: translateY(-100%); }
+        }
+        @keyframes winnerGlow {
+            0%, 100% {
+                box-shadow: 0 0 30px rgba(255, 0, 222, 0.8), 0 0 60px rgba(0, 255, 255, 0.6);
+                transform: scale(1);
+            }
+            50% {
+                box-shadow: 0 0 50px rgba(255, 0, 222, 1), 0 0 100px rgba(0, 255, 255, 0.8);
+                transform: scale(1.05);
+            }
+        }
+        @keyframes shimmer {
+            0% { background-position: -1000px 0; }
+            100% { background-position: 1000px 0; }
+        }
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-30px); }
+        }
+    `;
+    document.head.appendChild(style);
+
+    // 主标题
+    const title = document.createElement('div');
+    title.style.cssText = `
+        color: #fff;
+        font-size: 72px;
+        font-weight: bold;
+        text-shadow: 0 0 10px #fff, 0 0 20px #fff, 0 0 30px #ff00de, 0 0 40px #ff00de;
+        margin-bottom: 20px;
+        letter-spacing: 15px;
+        z-index: 10;
+        animation: neonPulse 2s ease-in-out infinite;
+    `;
+    title.textContent = '加州大乐透';
+    animBox.appendChild(title);
+
+    // 副标题（日期）
+    const subtitle = document.createElement('div');
+    const today = new Date();
+    const dateStr = `${today.getFullYear()}年${today.getMonth() + 1}月${today.getDate()}日`;
+    subtitle.style.cssText = `
+        color: #00ffff;
+        font-size: 32px;
+        text-shadow: 0 0 10px #00ffff, 0 0 20px #00ffff;
+        margin-bottom: 70px;
+        letter-spacing: 6px;
+        z-index: 10;
+    `;
+    subtitle.textContent = dateStr;
+    animBox.appendChild(subtitle);
+
+    // 主显示区域
+    const displayArea = document.createElement('div');
+    displayArea.style.cssText = `
+        display: flex;
+        gap: ${winners.length === 1 ? '0' : winners.length <= 3 ? '60px' : '45px'}px;
+        align-items: center;
+        justify-content: center;
+        flex-wrap: wrap;
+        z-index: 10;
+    `;
+    animBox.appendChild(displayArea);
+
+    // 为每个奖品创建老虎机轮盘
+    const slots = [];
+    winners.forEach((winner, index) => {
+        const slotWrapper = document.createElement('div');
+        slotWrapper.style.cssText = `
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 25px;
+        `;
+
+        // 奖品标签（顶部霓虹灯效果）
+        const prizeLabel = document.createElement('div');
+        prizeLabel.style.cssText = `
+            background: linear-gradient(90deg, #ff00de, #00ffff, #ff00de);
+            background-size: 200% 100%;
+            color: #000;
+            padding: 15px 35px;
+            border-radius: 25px;
+            font-size: ${winners.length === 1 ? '32px' : winners.length <= 3 ? '26px' : '22px'}px;
+            font-weight: bold;
+            box-shadow: 0 0 20px rgba(255, 0, 222, 0.8), 0 0 40px rgba(0, 255, 255, 0.6);
+            text-align: center;
+            min-width: 180px;
+            animation: shimmer 3s linear infinite;
+        `;
+        prizeLabel.textContent = prizes[index] || `奖品${index + 1}`;
+        slotWrapper.appendChild(prizeLabel);
+
+        // 老虎机轮盘容器
+        const slotMachine = document.createElement('div');
+        const slotWidth = winners.length === 1 ? 450 : winners.length <= 3 ? 350 : 280;
+        const slotHeight = winners.length === 1 ? 500 : winners.length <= 3 ? 400 : 320;
+        slotMachine.style.cssText = `
+            width: ${slotWidth}px;
+            height: ${slotHeight}px;
+            background: linear-gradient(135deg, rgba(0, 0, 0, 0.9) 0%, rgba(20, 0, 40, 0.95) 100%);
+            border: 5px solid #ff00de;
+            border-radius: 30px;
+            overflow: hidden;
+            position: relative;
+            box-shadow:
+                0 0 30px rgba(255, 0, 222, 0.6),
+                0 0 60px rgba(0, 255, 255, 0.4),
+                inset 0 0 50px rgba(0, 0, 0, 0.8);
+        `;
+
+        // 中间高亮框（霓虹灯边框）
+        const highlightFrame = document.createElement('div');
+        const itemHeight = winners.length === 1 ? 120 : winners.length <= 3 ? 100 : 80;
+        highlightFrame.style.cssText = `
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 90%;
+            height: ${itemHeight}px;
+            border: 4px solid #00ffff;
+            border-radius: 15px;
+            box-shadow:
+                0 0 20px #00ffff,
+                inset 0 0 20px rgba(0, 255, 255, 0.3);
+            pointer-events: none;
+            z-index: 3;
+        `;
+        slotMachine.appendChild(highlightFrame);
+
+        // 滚动内容容器
+        const scrollContainer = document.createElement('div');
+        scrollContainer.style.cssText = `
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            overflow: hidden;
+        `;
+
+        // 滚动列表
+        const scrollList = document.createElement('div');
+        scrollList.style.cssText = `
+            position: absolute;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+        `;
+
+        // 为每个轮盘创建随机打乱的玩家列表
+        const shuffledPlayers = [...allPlayers].sort(() => Math.random() - 0.5);
+
+        // 创建足够多的名字用于滚动（5倍）
+        const repeatedPlayers = [];
+        for (let i = 0; i < 5; i++) {
+            repeatedPlayers.push(...shuffledPlayers);
+        }
+
+        repeatedPlayers.forEach((name) => {
+            const nameItem = document.createElement('div');
+            nameItem.style.cssText = `
+                height: ${itemHeight}px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: ${winners.length === 1 ? '110px' : winners.length <= 3 ? '90px' : '72px'}px;
+                font-weight: bold;
+                color: #fff;
+                text-shadow: 0 0 15px #ff00de, 0 0 30px #00ffff;
+            `;
+            nameItem.textContent = name;
+            scrollList.appendChild(nameItem);
+        });
+
+        scrollContainer.appendChild(scrollList);
+        slotMachine.appendChild(scrollContainer);
+
+        // 上下渐变遮罩
+        const maskTop = document.createElement('div');
+        maskTop.style.cssText = `
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 150px;
+            background: linear-gradient(to bottom, rgba(0, 0, 0, 1) 0%, transparent 100%);
+            pointer-events: none;
+            z-index: 2;
+        `;
+        slotMachine.appendChild(maskTop);
+
+        const maskBottom = document.createElement('div');
+        maskBottom.style.cssText = `
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 150px;
+            background: linear-gradient(to top, rgba(0, 0, 0, 1) 0%, transparent 100%);
+            pointer-events: none;
+            z-index: 2;
+        `;
+        slotMachine.appendChild(maskBottom);
+
+        slotWrapper.appendChild(slotMachine);
+        displayArea.appendChild(slotWrapper);
+
+        // 计算目标位置 - 找到中奖者在打乱后列表中的位置
+        const targetIndex = shuffledPlayers.indexOf(winner) + shuffledPlayers.length * 2; // 中间段
+        const targetOffset = -(targetIndex * itemHeight - slotHeight / 2 + itemHeight / 2);
+
+        slots.push({
+            scrollList,
+            itemHeight,
+            targetOffset,
+            winner,
+            prizeLabel,
+            slotMachine,
+            highlightFrame,
+            currentOffset: 0,
+            velocity: 0
+        });
+    });
+
+    // 动画逻辑 - 10秒
+    const totalDuration = 10000;
+    const startTime = Date.now();
+
+    function animate() {
+        const elapsed = Date.now() - startTime;
+        const progress = Math.min(elapsed / totalDuration, 1);
+
+        // 缓动函数：快速开始，逐渐减速到精确停止
+        const easeOutQuart = 1 - Math.pow(1 - progress, 4);
+
+        slots.forEach((slot) => {
+            // 使用缓动函数从初始位置平滑过渡到目标位置
+            const startOffset = 0;
+            slot.currentOffset = startOffset + (slot.targetOffset - startOffset) * easeOutQuart;
+            slot.scrollList.style.transform = `translateY(${slot.currentOffset}px)`;
+        });
+
+        if (progress < 1) {
+            requestAnimationFrame(animate);
+        } else {
+            // 动画结束，立即显示中奖效果
+            showWinnerEffect();
+        }
+    }
+
+    function showWinnerEffect() {
+        // 更新标题
+        title.textContent = '🎉 恭喜中奖 🎉';
+        title.style.fontSize = '80px';
+        subtitle.style.display = 'none';
+
+        // 所有轮盘变金色霓虹灯
+        slots.forEach(slot => {
+            slot.slotMachine.style.borderColor = '#ffd700';
+            slot.slotMachine.style.animation = 'winnerGlow 1.5s ease-in-out infinite';
+            slot.highlightFrame.style.borderColor = '#ffd700';
+            slot.highlightFrame.style.boxShadow = '0 0 30px #ffd700, inset 0 0 30px rgba(255, 215, 0, 0.5)';
+            slot.prizeLabel.style.animation = 'bounce 1s ease-in-out infinite';
+        });
+
+        createFireworks(animBox);
+        createLightBurst(animBox);
+
+        setTimeout(() => {
+            showFinalResults();
+        }, 3000);
+    }
+
+    function createParticleBackground(parent) {
+        for (let i = 0; i < 100; i++) {
+            const particle = document.createElement('div');
+            particle.style.cssText = `
+                position: absolute;
+                width: ${2 + Math.random() * 4}px;
+                height: ${2 + Math.random() * 4}px;
+                background: ${Math.random() > 0.5 ? '#ff00de' : '#00ffff'};
+                border-radius: 50%;
+                top: ${Math.random() * 100}%;
+                left: ${Math.random() * 100}%;
+                opacity: ${0.2 + Math.random() * 0.5};
+                animation: float ${5 + Math.random() * 10}s ease-in-out infinite;
+                animation-delay: ${Math.random() * 5}s;
+            `;
+            parent.appendChild(particle);
+        }
+    }
+
+    function showFinalResults() {
+        displayArea.innerHTML = '';
+        title.textContent = '🎉 中奖名单 🎉';
+
+        const resultsContainer = document.createElement('div');
+        resultsContainer.style.cssText = `
+            display: flex;
+            gap: 50px;
+            flex-wrap: wrap;
+            justify-content: center;
+            align-items: center;
+        `;
+
+        winners.forEach((winner, i) => {
+            const resultCard = document.createElement('div');
+            resultCard.style.cssText = `
+                background: linear-gradient(135deg, rgba(255, 0, 222, 0.3) 0%, rgba(0, 255, 255, 0.3) 100%);
+                border: 6px solid #ffd700;
+                border-radius: 35px;
+                padding: ${winners.length === 1 ? '80px 100px' : winners.length <= 3 ? '60px 80px' : '45px 60px'};
+                text-align: center;
+                box-shadow: 0 0 50px rgba(255, 215, 0, 1), 0 0 100px rgba(255, 0, 222, 0.6);
+                opacity: 0;
+                transform: scale(0.3) rotateZ(-180deg);
+                position: relative;
+                overflow: hidden;
+            `;
+
+            // 闪光效果
+            const shine = document.createElement('div');
+            shine.style.cssText = `
+                position: absolute;
+                top: -50%;
+                left: -100%;
+                width: 50%;
+                height: 200%;
+                background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+                transform: skewX(-20deg);
+                animation: shimmer 2s infinite;
+            `;
+            resultCard.appendChild(shine);
+
+            // 奖品名称
+            const prizeText = document.createElement('div');
+            prizeText.style.cssText = `
+                font-size: ${winners.length === 1 ? '36px' : winners.length <= 3 ? '28px' : '22px'}px;
+                color: #00ffff;
+                text-shadow: 0 0 15px #00ffff;
+                margin-bottom: 20px;
+                position: relative;
+                z-index: 1;
+                font-weight: bold;
+            `;
+            prizeText.textContent = prizes[i] || `奖品${i + 1}`;
+            resultCard.appendChild(prizeText);
+
+            // 中奖者名字
+            const winnerText = document.createElement('div');
+            winnerText.style.cssText = `
+                font-size: ${winners.length === 1 ? '140px' : winners.length <= 3 ? '100px' : '75px'}px;
+                font-weight: bold;
+                color: #ffd700;
+                text-shadow: 0 0 30px #ffd700, 0 0 60px #ff00de;
+                position: relative;
+                z-index: 1;
+            `;
+            winnerText.textContent = winner;
+            resultCard.appendChild(winnerText);
+
+            resultsContainer.appendChild(resultCard);
+
+            // 逐个弹出动画
+            setTimeout(() => {
+                resultCard.style.transition = 'all 1s cubic-bezier(0.68, -0.55, 0.265, 1.55)';
+                resultCard.style.opacity = '1';
+                resultCard.style.transform = 'scale(1) rotateZ(0deg)';
+            }, i * 500);
+        });
+
+        displayArea.appendChild(resultsContainer);
+
+        // 4秒后关闭
+        setTimeout(() => {
+            container.style.display = 'none';
+            onComplete();
+        }, 5000);
+    }
+
+    function createFireworks(parent) {
+        for (let i = 0; i < 60; i++) {
+            const particle = document.createElement('div');
+            particle.style.cssText = `
+                position: absolute;
+                width: ${10 + Math.random() * 8}px;
+                height: ${10 + Math.random() * 8}px;
+                background: ${['#ffd700', '#ff00de', '#00ffff', '#ff6b6b', '#4ecdc4'][Math.floor(Math.random() * 5)]};
+                border-radius: 50%;
+                top: 50%;
+                left: 50%;
+                pointer-events: none;
+                box-shadow: 0 0 15px currentColor;
+            `;
+            parent.appendChild(particle);
+
+            const angle = (Math.PI * 2 * i) / 60;
+            const velocity = 10 + Math.random() * 20;
+            const vx = Math.cos(angle) * velocity;
+            const vy = Math.sin(angle) * velocity;
+
+            let x = 0, y = 0;
+            let opacity = 1;
+            let scale = 1;
+
+            function animateParticle() {
+                x += vx;
+                y += vy + 0.6;
+                opacity -= 0.012;
+                scale -= 0.012;
+
+                particle.style.transform = `translate(${x}px, ${y}px) scale(${scale})`;
+                particle.style.opacity = opacity;
+
+                if (opacity > 0) {
+                    requestAnimationFrame(animateParticle);
+                } else {
+                    particle.remove();
+                }
+            }
+            animateParticle();
+        }
+    }
+
+    function createLightBurst(parent) {
+        for (let i = 0; i < 12; i++) {
+            const beam = document.createElement('div');
+            beam.style.cssText = `
+                position: absolute;
+                width: 6px;
+                height: 400px;
+                background: linear-gradient(to bottom,
+                    ${i % 2 === 0 ? 'rgba(255, 0, 222, 0.9)' : 'rgba(0, 255, 255, 0.9)'},
+                    transparent);
+                top: 50%;
+                left: 50%;
+                transform-origin: top center;
+                transform: translate(-50%, -50%) rotate(${i * 30}deg);
+                pointer-events: none;
+                opacity: 1;
+            `;
+            parent.appendChild(beam);
+
+            let opacity = 1;
+            function animateBeam() {
+                opacity -= 0.015;
+                beam.style.opacity = opacity;
+                if (opacity > 0) {
+                    requestAnimationFrame(animateBeam);
+                } else {
+                    beam.remove();
+                }
+            }
+            animateBeam();
+        }
+    }
+
+    // 启动动画
+    animate();
+}
+
+// 抽奖功能事件监听
 function setupLotteryEventListeners() {
     const createBtn = document.getElementById('create-lottery-btn');
     if (createBtn) {
@@ -1547,5 +2146,11 @@ function setupLotteryEventListeners() {
         searchInput.addEventListener('input', (e) => {
             renderLotteryPlayerList(e.target.value.trim());
         });
+    }
+
+    // 关���按钮
+    const closeBtn = document.querySelector('#lottery-modal .close');
+    if (closeBtn) {
+        closeBtn.addEventListener('click', closeLotteryModal);
     }
 }

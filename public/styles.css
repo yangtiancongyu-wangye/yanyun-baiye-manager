@@ -829,11 +829,65 @@ tbody tr:hover {
 }
 
 #lottery-player-list {
-    background: #f9f9f9;
+    background: #ffffff;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+#lottery-player-list > div {
+    padding: 12px !important;
+    border-bottom: 1px solid #eee;
+    display: flex !important;
+    align-items: center;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+#lottery-player-list > div:hover {
+    background: rgba(94, 179, 214, 0.08);
+}
+
+#lottery-player-list input[type="checkbox"] {
+    margin-right: 12px;
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+}
+
+#lottery-player-list label {
+    flex: 1;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+#lottery-player-list label > span:first-child {
+    font-weight: bold;
+    color: var(--text-primary);
+}
+
+#lottery-player-list label > span:last-child {
+    color: #666;
+    font-size: 13px;
+}
+
+#lottery-selected-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 8px;
 }
 
 #lottery-selected-tags span {
+    display: inline-block;
+    padding: 6px 12px;
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+    color: white;
+    border-radius: 6px;
+    font-size: 13px;
     cursor: default;
+    box-shadow: 0 2px 8px rgba(94, 179, 214, 0.3);
 }
 
 #lottery-modal .form-group {
@@ -854,4 +908,39 @@ tbody tr:hover {
     border: 1px solid var(--border);
     border-radius: 6px;
     font-size: 14px;
+}
+
+/* 抽奖动画样式 */
+#lottery-animation-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.95);
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* 密码锁轮盘渐变遮罩效果 */
+.slot-mask-top,
+.slot-mask-bottom {
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 80px;
+    pointer-events: none;
+    z-index: 3;
+}
+
+.slot-mask-top {
+    top: 0;
+    background: linear-gradient(to bottom, #1a1a2e 0%, transparent 100%);
+}
+
+.slot-mask-bottom {
+    bottom: 0;
+    background: linear-gradient(to top, #1a1a2e 0%, transparent 100%);
 }
