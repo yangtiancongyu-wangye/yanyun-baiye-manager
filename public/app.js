@@ -1773,8 +1773,8 @@ function showLotteryAnimation(allPlayers, winners, prizes, onComplete) {
 
         // 老虎机轮盘容器
         const slotMachine = document.createElement('div');
-        const slotWidth = winners.length === 1 ? 480 : winners.length <= 3 ? 380 : 300;
-        const slotHeight = winners.length === 1 ? 540 : winners.length <= 3 ? 440 : 350;
+        const slotWidth = winners.length === 1 ? 380 : winners.length <= 3 ? 320 : 260;
+        const slotHeight = winners.length === 1 ? 420 : winners.length <= 3 ? 360 : 290;
         slotMachine.style.cssText = `
             width: ${slotWidth}px;
             height: ${slotHeight}px;
@@ -1846,7 +1846,7 @@ function showLotteryAnimation(allPlayers, winners, prizes, onComplete) {
                 display: flex;
                 align-items: center;
                 justify-content: center;
-                font-size: ${winners.length === 1 ? '120px' : winners.length <= 3 ? '98px' : '78px'}px;
+                font-size: ${winners.length === 1 ? '100px' : winners.length <= 3 ? '85px' : '68px'}px;
                 font-weight: 900;
                 color: #fff;
                 text-shadow: 0 0 20px #ff00de, 0 0 40px #00ffff, 0 0 60px rgba(255, 0, 222, 0.5);
