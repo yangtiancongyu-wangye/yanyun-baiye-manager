@@ -137,217 +137,221 @@
   },
   "2026-03-08": {
     "attack": [
-      [],
-      [],
-      []
+      [
+        {
+          "id": "飞天大蟑螂",
+          "professions": [
+            "肉陌",
+            "控制陌"
+          ],
+          "startPlan": "压下路转中路",
+          "followPlan": "跟红车/护送红车"
+        },
+        {
+          "id": "秦兆丰",
+          "professions": [
+            "无名"
+          ],
+          "startPlan": "压下路转中路",
+          "followPlan": "跟红车/护送红车"
+        },
+        {
+          "id": "王荒炎",
+          "professions": [
+            "无名"
+          ],
+          "startPlan": "压下路转中路",
+          "followPlan": "跟红车/护送红车"
+        },
+        {
+          "id": "三石",
+          "professions": [
+            "拳头"
+          ],
+          "startPlan": "压下路转中路",
+          "followPlan": "跟红车/护送红车"
+        },
+        {
+          "id": "安平君祝",
+          "professions": [
+            "纯奶"
+          ],
+          "startPlan": "压下路转中路",
+          "followPlan": "跟红车/护送红车"
+        }
+      ],
+      [
+        {
+          "id": "以年",
+          "professions": [
+            "肉陌",
+            "陌刀"
+          ],
+          "startPlan": "压上路塔",
+          "followPlan": "25/15 Boss/跟红车"
+        },
+        {
+          "id": "涂慕辞",
+          "professions": [
+            "无名"
+          ],
+          "startPlan": "压上路塔",
+          "followPlan": "25/15 Boss/跟红车"
+        },
+        {
+          "id": "穗穗平安",
+          "professions": [
+            "无名"
+          ],
+          "startPlan": "压上路塔",
+          "followPlan": "25/15 Boss/跟红车"
+        },
+        {
+          "id": "柿水",
+          "professions": [
+            "无名"
+          ],
+          "startPlan": "压上路塔",
+          "followPlan": "25/15 Boss/跟红车"
+        },
+        {
+          "id": "柴喵",
+          "professions": [
+            "纯奶"
+          ],
+          "startPlan": "压上路塔",
+          "followPlan": "25/15 Boss/跟红车"
+        }
+      ],
+      [
+        {
+          "id": "风千杨",
+          "professions": [
+            "十方陌",
+            "陌刀"
+          ],
+          "startPlan": "人墙反野/对面外野下野",
+          "followPlan": "25/15 Boss/双扇干扰/打对面伐木工"
+        },
+        {
+          "id": "宛有",
+          "professions": [
+            "无名"
+          ],
+          "startPlan": "人墙反野/对面外野下野",
+          "followPlan": "25/15 Boss/双扇干扰/打对面伐木工"
+        },
+        {
+          "id": "攸风",
+          "professions": [
+            "无名"
+          ],
+          "startPlan": "人墙反野/对面外野下野",
+          "followPlan": "25/15 Boss/双扇干扰/打对面伐木工"
+        },
+        {
+          "id": "柳雾轻烟",
+          "professions": [
+            "尘"
+          ],
+          "startPlan": "人墙反野/对面外野下野",
+          "followPlan": "25/15 Boss/双扇干扰/打对面伐木工"
+        },
+        {
+          "id": "墨灵渊",
+          "professions": [
+            "纯奶",
+            "双扇"
+          ],
+          "startPlan": "人墙反野/对面外野下野",
+          "followPlan": "25/15 Boss/双扇干扰/打对面伐木工"
+        }
+      ]
     ],
     "defense": [
-      [],
-      [],
+      [
+        {
+          "id": "斩红郎",
+          "professions": [
+            "陌刀",
+            "十方陌无名"
+          ],
+          "startPlan": "守上塔/护我上野",
+          "followPlan": "守蓝车杀人"
+        },
+        {
+          "id": "晏极",
+          "professions": [
+            "无名",
+            "打野"
+          ],
+          "startPlan": "守上塔/护我上野",
+          "followPlan": "守蓝车杀人"
+        },
+        {
+          "id": "费曼",
+          "professions": [
+            "无名",
+            "陌刀风扇"
+          ],
+          "startPlan": "守上塔/护我上野",
+          "followPlan": "守蓝车杀人"
+        },
+        {
+          "id": "起风了",
+          "professions": [
+            "无名"
+          ],
+          "startPlan": "守上塔/护我上野",
+          "followPlan": "守蓝车杀人"
+        },
+        {
+          "id": "林镜流",
+          "professions": [
+            "纯奶"
+          ],
+          "startPlan": "守上塔/护我上野",
+          "followPlan": "守蓝车杀人"
+        }
+      ],
+      [
+        {
+          "id": "鬼公仔",
+          "professions": [
+            "陌双"
+          ],
+          "startPlan": "守下塔/护我下野",
+          "followPlan": "守蓝车杀人"
+        },
+        {
+          "id": "震霸天",
+          "professions": [
+            "陌九",
+            "九九"
+          ],
+          "startPlan": "守下塔/护我下野",
+          "followPlan": "守蓝车杀人"
+        },
+        {
+          "id": "常伴明月",
+          "professions": [
+            "陌奶",
+            "陌刀风扇"
+          ],
+          "startPlan": "守下塔/护我下野",
+          "followPlan": "守蓝车杀人"
+        },
+        {
+          "id": "寒沉烟",
+          "professions": [
+            "纯奶"
+          ],
+          "startPlan": "守下塔/护我下野",
+          "followPlan": "守蓝车杀人"
+        }
+      ],
       []
     ],
-    "availablePlayers": [
-      {
-        "id": "飞天大蟑螂",
-        "professions": [
-          "肉陌",
-          "控制陌"
-        ],
-        "startPlan": "压下路转中路",
-        "followPlan": "跟红车/护送红车"
-      },
-      {
-        "id": "秦兆丰",
-        "professions": [
-          "无名"
-        ],
-        "startPlan": "压下路转中路",
-        "followPlan": "跟红车/护送红车"
-      },
-      {
-        "id": "王荒炎",
-        "professions": [
-          "无名"
-        ],
-        "startPlan": "压下路转中路",
-        "followPlan": "跟红车/护送红车"
-      },
-      {
-        "id": "涂慕辞",
-        "professions": [
-          "无名"
-        ],
-        "startPlan": "压下路转中路",
-        "followPlan": "跟红车/护送红车"
-      },
-      {
-        "id": "安平君祝",
-        "professions": [
-          "纯奶"
-        ],
-        "startPlan": "压下路转中路",
-        "followPlan": "跟红车/护送红车"
-      },
-      {
-        "id": "以年",
-        "professions": [
-          "肉陌",
-          "陌刀"
-        ],
-        "startPlan": "压上路塔",
-        "followPlan": "25/15 Boss/跟红车"
-      },
-      {
-        "id": "穗穗平安",
-        "professions": [
-          "无名"
-        ],
-        "startPlan": "压上路塔",
-        "followPlan": "25/15 Boss/跟红车"
-      },
-      {
-        "id": "柿水",
-        "professions": [
-          "无名"
-        ],
-        "startPlan": "压上路塔",
-        "followPlan": "25/15 Boss/跟红车"
-      },
-      {
-        "id": "宛有",
-        "professions": [
-          "无名"
-        ],
-        "startPlan": "压上路塔",
-        "followPlan": "25/15 Boss/跟红车"
-      },
-      {
-        "id": "柴喵",
-        "professions": [
-          "纯奶"
-        ],
-        "startPlan": "压上路塔",
-        "followPlan": "25/15 Boss/跟红车"
-      },
-      {
-        "id": "风千杨",
-        "professions": [
-          "十方陌",
-          "陌刀"
-        ],
-        "startPlan": "人墙反野/对面外野下野",
-        "followPlan": "25/15 Boss/双扇干扰/打对面伐木工"
-      },
-      {
-        "id": "攸风",
-        "professions": [
-          "无名"
-        ],
-        "startPlan": "人墙反野/对面外野下野",
-        "followPlan": "25/15 Boss/双扇干扰/打对面伐木工"
-      },
-      {
-        "id": "晏极",
-        "professions": [
-          "无名",
-          "打野"
-        ],
-        "startPlan": "人墙反野/对面外野下野",
-        "followPlan": "25/15 Boss/双扇干扰/打对面伐木工"
-      },
-      {
-        "id": "三石",
-        "professions": [
-          "拳头"
-        ],
-        "startPlan": "人墙反野/对面外野下野",
-        "followPlan": "25/15 Boss/双扇干扰/打对面伐木工"
-      },
-      {
-        "id": "墨灵渊",
-        "professions": [
-          "纯奶",
-          "双扇"
-        ],
-        "startPlan": "人墙反野/对面外野下野",
-        "followPlan": "25/15 Boss/双扇干扰/打对面伐木工"
-      },
-      {
-        "id": "鬼公仔",
-        "professions": [
-          "陌双"
-        ],
-        "startPlan": "守上塔/护我上野",
-        "followPlan": "守蓝车杀人"
-      },
-      {
-        "id": "费曼",
-        "professions": [
-          "无名",
-          "陌刀风扇"
-        ],
-        "startPlan": "守上塔/护我上野",
-        "followPlan": "守蓝车杀人"
-      },
-      {
-        "id": "起风了",
-        "professions": [
-          "无名"
-        ],
-        "startPlan": "守上塔/护我上野",
-        "followPlan": "守蓝车杀人"
-      },
-      {
-        "id": "柳雾轻烟",
-        "professions": [
-          "尘"
-        ],
-        "startPlan": "守上塔/护我上野",
-        "followPlan": "守蓝车杀人"
-      },
-      {
-        "id": "林镜流",
-        "professions": [
-          "纯奶"
-        ],
-        "startPlan": "守上塔/护我上野",
-        "followPlan": "守蓝车杀人"
-      },
-      {
-        "id": "斩红郎",
-        "professions": [
-          "陌刀",
-          "十方陌无名"
-        ],
-        "startPlan": "守下塔/护我下野",
-        "followPlan": "守蓝车杀人"
-      },
-      {
-        "id": "震霸天",
-        "professions": [
-          "陌九",
-          "九九"
-        ],
-        "startPlan": "守下塔/护我下野",
-        "followPlan": "守蓝车杀人"
-      },
-      {
-        "id": "常伴明月",
-        "professions": [
-          "陌奶",
-          "陌刀风扇"
-        ],
-        "startPlan": "守下塔/护我下野",
-        "followPlan": "守蓝车杀人"
-      },
-      {
-        "id": "寒沉烟",
-        "professions": [
-          "纯奶"
-        ],
-        "startPlan": "守下塔/护我下野",
-        "followPlan": "守蓝车杀人"
-      }
-    ]
+    "availablePlayers": []
   }
 }
