@@ -814,106 +814,127 @@ async function handleExportTeam() {
             left: -9999px;
             top: 0;
             width: 1600px;
-            padding: 60px 70px;
-            background: #1a1208;
+            padding: 80px 100px;
+            background: #f2f0eb;
             font-family: 'KaiTi', 'STKaiti', 'SimSun', serif;
+            border-left: 16px solid #3d3d3d;
+            border-right: 16px solid #3d3d3d;
+            box-shadow: inset 0 0 80px rgba(0,0,0,0.08);
         `;
 
         const teamData = teams[currentBattleDate];
+
+        // 全局统一字号：遍历所有成员找最长文字，算出统一字号和行高
+        let maxPlanLen = 0;
+        ['attack', 'defense'].forEach(brigade => {
+            teamData[brigade].forEach(squad => {
+                squad.forEach(member => {
+                    if (!member) return;
+                    maxPlanLen = Math.max(maxPlanLen, (member.startPlan || '').length, (member.followPlan || '').length);
+                });
+            });
+        });
+        const planFontSize = maxPlanLen <= 12 ? 14 : maxPlanLen <= 24 ? 12 : maxPlanLen <= 36 ? 10 : 9;
+        // 行高：字号 * 行距 * 最多行数 + 上下padding
+        const maxLines = maxPlanLen <= 12 ? 1 : 2;
+        const rowHeight = planFontSize * 1.4 * maxLines + 18;
+
         let content = `
             <div style="position: relative;">
-                <!-- 背景纹理层 -->
+                <!-- 水墨晕染背景 -->
                 <div style="position: absolute; inset: 0; background:
-                    radial-gradient(ellipse at 15% 20%, rgba(180,120,40,0.08) 0%, transparent 50%),
-                    radial-gradient(ellipse at 85% 80%, rgba(180,120,40,0.06) 0%, transparent 50%),
-                    radial-gradient(ellipse at 50% 50%, rgba(100,60,10,0.15) 0%, transparent 80%);
+                    radial-gradient(circle at 15% 20%, rgba(0,0,0,0.03) 0%, transparent 40%),
+                    radial-gradient(circle at 85% 80%, rgba(0,0,0,0.04) 0%, transparent 50%),
+                    radial-gradient(circle at 50% 50%, rgba(0,0,0,0.02) 0%, transparent 60%);
                     pointer-events: none;"></div>
+                <!-- 墨迹晕染左上 -->
+                <div style="position: absolute; width: 500px; height: 350px; top: -80px; left: -80px; opacity: 0.08;
+                    background: radial-gradient(ellipse at center, rgba(44,44,44,1) 0%, rgba(44,44,44,0) 70%);
+                    border-radius: 50%; filter: blur(20px); pointer-events: none;"></div>
+                <!-- 墨迹晕染右下 -->
+                <div style="position: absolute; width: 700px; height: 500px; bottom: -150px; right: -150px; opacity: 0.06;
+                    background: radial-gradient(ellipse at center, rgba(44,44,44,1) 0%, rgba(44,44,44,0) 70%);
+                    border-radius: 50%; filter: blur(20px); pointer-events: none;"></div>
 
-                <!-- 四角装饰 -->
-                <div style="position: absolute; top: -10px; left: -10px; width: 80px; height: 80px;
-                    border-top: 2px solid rgba(180,140,60,0.6); border-left: 2px solid rgba(180,140,60,0.6);"></div>
-                <div style="position: absolute; top: -10px; right: -10px; width: 80px; height: 80px;
-                    border-top: 2px solid rgba(180,140,60,0.6); border-right: 2px solid rgba(180,140,60,0.6);"></div>
-                <div style="position: absolute; bottom: -10px; left: -10px; width: 80px; height: 80px;
-                    border-bottom: 2px solid rgba(180,140,60,0.6); border-left: 2px solid rgba(180,140,60,0.6);"></div>
-                <div style="position: absolute; bottom: -10px; right: -10px; width: 80px; height: 80px;
-                    border-bottom: 2px solid rgba(180,140,60,0.6); border-right: 2px solid rgba(180,140,60,0.6);"></div>
+                <!-- 左上竹叶 -->
+                <div style="position: absolute; top: 30px; left: 30px; transform: scale(1.2);">
+                    <div style="position: absolute; width: 70px; height: 26px; background: rgba(50,65,50,0.55); border-radius: 0 100% 0 100%; transform: rotate(-10deg); top: 0; left: 0;"></div>
+                    <div style="position: absolute; width: 55px; height: 22px; background: rgba(50,65,50,0.45); border-radius: 0 100% 0 100%; transform: rotate(15deg); top: 18px; left: 35px;"></div>
+                    <div style="position: absolute; width: 80px; height: 30px; background: rgba(50,65,50,0.5); border-radius: 0 100% 0 100%; transform: rotate(-25deg); top: -18px; left: 18px;"></div>
+                </div>
+                <!-- 右上竹叶 -->
+                <div style="position: absolute; top: 30px; right: 30px; transform: scale(1.2) scaleX(-1);">
+                    <div style="position: absolute; width: 70px; height: 26px; background: rgba(50,65,50,0.55); border-radius: 0 100% 0 100%; transform: rotate(-10deg); top: 0; left: 0;"></div>
+                    <div style="position: absolute; width: 55px; height: 22px; background: rgba(50,65,50,0.45); border-radius: 0 100% 0 100%; transform: rotate(15deg); top: 18px; left: 35px;"></div>
+                    <div style="position: absolute; width: 80px; height: 30px; background: rgba(50,65,50,0.5); border-radius: 0 100% 0 100%; transform: rotate(-25deg); top: -18px; left: 18px;"></div>
+                </div>
+
+                <!-- 左侧竖排装饰文字 -->
+                <div style="position: absolute; top: 180px; left: 18px; font-size: 22px; color: rgba(44,44,44,0.3);
+                    writing-mode: vertical-rl; letter-spacing: 6px; line-height: 1.5;">乾坤未定 势如破竹</div>
+                <!-- 右侧竖排装饰文字 -->
+                <div style="position: absolute; top: 180px; right: 18px; font-size: 22px; color: rgba(44,44,44,0.3);
+                    writing-mode: vertical-rl; letter-spacing: 6px; line-height: 1.5;">运筹帷幄 决胜千里</div>
 
                 <!-- 标题区域 -->
-                <div style="text-align: center; margin-bottom: 50px; position: relative; z-index: 1; padding-top: 10px;">
-                    <!-- 顶部细线 -->
-                    <div style="margin: 0 auto 28px; display: flex; align-items: center; gap: 16px; justify-content: center;">
-                        <div style="flex: 1; max-width: 200px; height: 1px; background: linear-gradient(90deg, transparent, rgba(180,140,60,0.8));"></div>
-                        <div style="width: 6px; height: 6px; background: rgba(180,140,60,0.9); transform: rotate(45deg);"></div>
-                        <div style="width: 4px; height: 4px; background: rgba(180,140,60,0.6); transform: rotate(45deg);"></div>
-                        <div style="width: 6px; height: 6px; background: rgba(180,140,60,0.9); transform: rotate(45deg);"></div>
-                        <div style="flex: 1; max-width: 200px; height: 1px; background: linear-gradient(90deg, rgba(180,140,60,0.8), transparent);"></div>
-                    </div>
+                <div style="text-align: center; margin-bottom: 60px; position: relative; z-index: 1; padding-top: 20px;">
+                    <h1 style="font-size: 72px; color: #1a1a1a; margin: 0 0 20px; letter-spacing: 20px;
+                        text-shadow: 4px 4px 0px rgba(0,0,0,0.1); font-weight: bold;">加州理工学院百业战安排</h1>
+                    <!-- 印章 -->
+                    <div style="position: absolute; right: 80px; top: 10px; width: 70px; height: 70px;
+                        border: 3px solid #8B0000; color: #8B0000; font-size: 26px; line-height: 64px;
+                        text-align: center; border-radius: 6px; transform: rotate(-15deg); opacity: 0.75;">机密</div>
 
-                    <h1 style="font-size: 62px; color: #e8d5a0; margin: 0 0 6px; letter-spacing: 16px;
-                        text-shadow: 0 0 40px rgba(180,140,60,0.4), 2px 2px 0 rgba(0,0,0,0.8);
-                        font-weight: bold;">加州理工学院百业战安排</h1>
-
-                    <div style="margin: 22px auto; display: flex; align-items: center; gap: 12px; justify-content: center;">
-                        <div style="flex: 1; max-width: 280px; height: 1px; background: linear-gradient(90deg, transparent, rgba(180,140,60,0.5));"></div>
-                        <div style="font-size: 22px; color: #b8956a; letter-spacing: 8px;">${currentBattleDate}</div>
-                        <div style="flex: 1; max-width: 280px; height: 1px; background: linear-gradient(90deg, rgba(180,140,60,0.5), transparent);"></div>
+                    <div style="display: inline-block; font-size: 26px; color: #555; letter-spacing: 4px;
+                        border-top: 2px solid #8B0000; border-bottom: 2px solid #8B0000;
+                        padding: 10px 40px; position: relative;">
+                        <span style="position: absolute; left: -20px; top: 50%; transform: translateY(-50%); color: #8B0000; font-size: 20px;">◆</span>
+                        ${currentBattleDate}
+                        <span style="position: absolute; right: -20px; top: 50%; transform: translateY(-50%); color: #8B0000; font-size: 20px;">◆</span>
                     </div>
                 </div>
         `;
 
-        ['attack', 'defense'].forEach((brigade, brigadeIdx) => {
+        ['attack', 'defense'].forEach((brigade) => {
             const brigadeName = brigade === 'attack' ? '进攻大队' : '防守大队';
-            const brigadeColor = brigade === 'attack' ? '#c0392b' : '#2471a3';
-            const brigadeGlow = brigade === 'attack' ? 'rgba(192,57,43,0.3)' : 'rgba(36,113,163,0.3)';
+            const brigadeLeftPrefix = brigade === 'attack' ? '疾如' : '徐如';
+            const brigadeLeftLast = brigade === 'attack' ? '风' : '林';
+            const brigadeRightPrefix = brigade === 'attack' ? '侵略如' : '不动如';
+            const brigadeRightLast = brigade === 'attack' ? '火' : '山';
             content += `
-                <div style="margin-bottom: 40px; position: relative; z-index: 1;">
-                    <!-- 大队标题 -->
-                    <div style="text-align: center; margin-bottom: 24px;">
-                        <div style="display: inline-flex; align-items: center; gap: 20px;">
-                            <div style="width: 60px; height: 1px; background: linear-gradient(90deg, transparent, ${brigadeColor});"></div>
-                            <div style="width: 8px; height: 8px; background: ${brigadeColor}; transform: rotate(45deg); box-shadow: 0 0 8px ${brigadeGlow};"></div>
-                            <h2 style="font-size: 34px; color: #e8d5a0; margin: 0; letter-spacing: 10px;
-                                text-shadow: 0 0 20px ${brigadeGlow}, 1px 1px 0 rgba(0,0,0,0.9);">
-                                ${brigadeName}
-                            </h2>
-                            <div style="width: 8px; height: 8px; background: ${brigadeColor}; transform: rotate(45deg); box-shadow: 0 0 8px ${brigadeGlow};"></div>
-                            <div style="width: 60px; height: 1px; background: linear-gradient(90deg, ${brigadeColor}, transparent);"></div>
-                        </div>
+                <div style="margin-bottom: 60px; position: relative; z-index: 1;">
+                    <div style="display: flex; align-items: center; justify-content: center; margin-bottom: 36px;">
+                        <span style="color: #8B0000; font-size: 26px; margin: 0 14px; font-family: 'STXingkai', 'STKaiti', 'KaiTi', cursive; letter-spacing: 3px; font-style: italic;">${brigadeLeftPrefix}<span style="font-size: 40px; font-weight: bold;">${brigadeLeftLast}</span></span>
+                        <div style="height: 3px; width: 120px; background: linear-gradient(90deg, transparent, #8B0000, transparent);"></div>
+                        <h2 style="font-size: 48px; color: #2c2c2c; margin: 0 30px; letter-spacing: 8px; font-weight: bold;">${brigadeName}</h2>
+                        <div style="height: 3px; width: 120px; background: linear-gradient(90deg, transparent, #8B0000, transparent);"></div>
+                        <span style="color: #8B0000; font-size: 26px; margin: 0 14px; font-family: 'STXingkai', 'STKaiti', 'KaiTi', cursive; letter-spacing: 3px; font-style: italic;">${brigadeRightPrefix}<span style="font-size: 40px; font-weight: bold;">${brigadeRightLast}</span></span>
                     </div>
-                    <div style="display: flex; gap: 18px;">
+                    <div style="display: flex; gap: 28px;">
             `;
 
             teamData[brigade].forEach((squad, squadIndex) => {
                 const squadNums = ['一', '二', '三'];
                 content += `
-                    <div style="flex: 1; background: linear-gradient(160deg, rgba(40,28,10,0.95) 0%, rgba(28,18,6,0.98) 100%);
-                        border: 1px solid rgba(180,140,60,0.3);
-                        border-radius: 4px; padding: 20px 18px;
-                        box-shadow: 0 4px 24px rgba(0,0,0,0.6), inset 0 1px 0 rgba(180,140,60,0.1);
-                        position: relative; overflow: hidden;">
-                        <!-- 卡片内角装饰 -->
-                        <div style="position: absolute; top: 8px; left: 8px; width: 20px; height: 20px;
-                            border-top: 1px solid rgba(180,140,60,0.4); border-left: 1px solid rgba(180,140,60,0.4);"></div>
-                        <div style="position: absolute; top: 8px; right: 8px; width: 20px; height: 20px;
-                            border-top: 1px solid rgba(180,140,60,0.4); border-right: 1px solid rgba(180,140,60,0.4);"></div>
-                        <div style="position: absolute; bottom: 8px; left: 8px; width: 20px; height: 20px;
-                            border-bottom: 1px solid rgba(180,140,60,0.4); border-left: 1px solid rgba(180,140,60,0.4);"></div>
-                        <div style="position: absolute; bottom: 8px; right: 8px; width: 20px; height: 20px;
-                            border-bottom: 1px solid rgba(180,140,60,0.4); border-right: 1px solid rgba(180,140,60,0.4);"></div>
+                    <div style="flex: 1; background: rgba(255,255,255,0.65);
+                        border: 2px solid #4a4a4a; border-radius: 4px; padding: 22px 20px;
+                        box-shadow: 8px 8px 0px rgba(0,0,0,0.1); position: relative; overflow: hidden;">
+                        <!-- 内层细边框 -->
+                        <div style="position: absolute; top: 6px; left: 6px; right: 6px; bottom: 6px;
+                            border: 1px solid #999; pointer-events: none;"></div>
 
-                        <h3 style="text-align: center; font-size: 24px; color: #e8d5a0; margin: 0 0 16px;
-                            letter-spacing: 6px; padding-bottom: 12px;
-                            border-bottom: 1px solid rgba(180,140,60,0.3); position: relative;">
+                        <h3 style="text-align: center; font-size: 28px; color: #111; margin: 0 0 18px;
+                            letter-spacing: 6px; padding-bottom: 14px;
+                            border-bottom: 2px solid #2c2c2c;">
                             第${squadNums[squadIndex]}小队
                         </h3>
-                        <table style="width: 100%; border-collapse: collapse;">
+                        <table style="width: 100%; border-collapse: collapse; table-layout: fixed;">
                             <thead>
-                                <tr style="background: rgba(180,140,60,0.12);">
-                                    <th style="padding: 9px 8px; font-size: 15px; color: #b8956a; border-bottom: 1px solid rgba(180,140,60,0.25); text-align: left; font-weight: normal; letter-spacing: 2px;">人员</th>
-                                    <th style="padding: 9px 8px; font-size: 15px; color: #b8956a; border-bottom: 1px solid rgba(180,140,60,0.25); font-weight: normal; letter-spacing: 2px;">流派</th>
-                                    <th style="padding: 9px 8px; font-size: 15px; color: #b8956a; border-bottom: 1px solid rgba(180,140,60,0.25); font-weight: normal; letter-spacing: 2px;">开局安排</th>
-                                    <th style="padding: 9px 8px; font-size: 15px; color: #b8956a; border-bottom: 1px solid rgba(180,140,60,0.25); font-weight: normal; letter-spacing: 2px;">后续安排</th>
+                                <tr>
+                                    <th style="padding: 10px 6px; font-size: 16px; color: #8B0000; border-bottom: 2px solid #8B0000; text-align: center; font-weight: bold; letter-spacing: 2px; width: 18%;">人员</th>
+                                    <th style="padding: 10px 6px; font-size: 16px; color: #8B0000; border-bottom: 2px solid #8B0000; text-align: center; font-weight: bold; letter-spacing: 2px; width: 20%;">流派</th>
+                                    <th style="padding: 10px 6px; font-size: 16px; color: #8B0000; border-bottom: 2px solid #8B0000; text-align: center; font-weight: bold; letter-spacing: 2px; width: 31%;">开局安排</th>
+                                    <th style="padding: 10px 6px; font-size: 16px; color: #8B0000; border-bottom: 2px solid #8B0000; text-align: center; font-weight: bold; letter-spacing: 2px; width: 31%;">后续安排</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -921,20 +942,20 @@ async function handleExportTeam() {
 
                 for (let i = 0; i < 5; i++) {
                     const member = squad[i];
-                    const rowBg = i % 2 === 0 ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.15)';
+                    const rowBg = i % 2 === 0 ? 'transparent' : 'rgba(0,0,0,0.02)';
                     if (member) {
                         content += `
-                            <tr style="background: ${rowBg}; border-bottom: 1px solid rgba(180,140,60,0.1);">
-                                <td style="padding: 9px 8px; font-size: 17px; color: #e8d5a0; font-weight: bold; letter-spacing: 1px;">${member.id}</td>
-                                <td style="padding: 9px 8px; font-size: 13px; color: #c4a882; text-align: center; line-height: 1.5;">${(member.professions || []).join('、')}</td>
-                                <td style="padding: 9px 8px; font-size: 14px; color: #d4c090; line-height: 1.5;">${member.startPlan || '—'}</td>
-                                <td style="padding: 9px 8px; font-size: 14px; color: #d4c090; line-height: 1.5;">${member.followPlan || '—'}</td>
+                            <tr style="background: ${rowBg}; border-bottom: 1px dashed #999;">
+                                <td style="padding: 0 6px; height: ${rowHeight}px; font-size: 17px; color: #1a1a1a; font-weight: bold; letter-spacing: 1px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${member.id}</td>
+                                <td style="padding: 0 6px; height: ${rowHeight}px; font-size: 14px; color: #333; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${(member.professions || []).join('、')}</td>
+                                <td style="padding: 0 6px; height: ${rowHeight}px; font-size: ${planFontSize}px; color: #333; text-align: center; white-space: normal; word-break: break-all; line-height: 1.4;">${member.startPlan || '—'}</td>
+                                <td style="padding: 0 6px; height: ${rowHeight}px; font-size: ${planFontSize}px; color: #333; text-align: center; white-space: normal; word-break: break-all; line-height: 1.4;">${member.followPlan || '—'}</td>
                             </tr>
                         `;
                     } else {
                         content += `
-                            <tr style="background: ${rowBg}; border-bottom: 1px solid rgba(180,140,60,0.1);">
-                                <td colspan="4" style="padding: 9px 8px; font-size: 14px; color: rgba(180,140,60,0.3); text-align: center; letter-spacing: 2px;">虚位以待</td>
+                            <tr style="background: ${rowBg}; border-bottom: 1px dashed #999;">
+                                <td colspan="4" style="padding: 0 6px; height: ${rowHeight}px; font-size: 14px; color: rgba(139,0,0,0.3); text-align: center; letter-spacing: 2px;">虚位以待</td>
                             </tr>
                         `;
                     }
@@ -952,11 +973,13 @@ async function handleExportTeam() {
 
         content += `
                 <!-- 底部装饰 -->
-                <div style="margin-top: 44px; text-align: center; position: relative; z-index: 1;">
-                    <div style="display: flex; align-items: center; gap: 16px; justify-content: center;">
-                        <div style="flex: 1; max-width: 300px; height: 1px; background: linear-gradient(90deg, transparent, rgba(180,140,60,0.5));"></div>
-                        <div style="font-size: 13px; color: rgba(180,140,60,0.4); letter-spacing: 4px;">燕云百业</div>
-                        <div style="flex: 1; max-width: 300px; height: 1px; background: linear-gradient(90deg, rgba(180,140,60,0.5), transparent);"></div>
+                <div style="margin-top: 50px; text-align: center; position: relative; z-index: 1;">
+                    <div style="display: flex; align-items: center; gap: 20px; justify-content: center;">
+                        <div style="flex: 1; max-width: 400px; height: 2px; background: linear-gradient(90deg, transparent, #8B0000);"></div>
+                        <span style="color: #8B0000; font-size: 20px;">◆</span>
+                        <div style="font-size: 20px; color: #555; letter-spacing: 6px;">燕云百业 · 加州理工</div>
+                        <span style="color: #8B0000; font-size: 20px;">◆</span>
+                        <div style="flex: 1; max-width: 400px; height: 2px; background: linear-gradient(90deg, #8B0000, transparent);"></div>
                     </div>
                 </div>
             </div>
@@ -966,7 +989,7 @@ async function handleExportTeam() {
         document.body.appendChild(exportContainer);
 
         const canvas = await html2canvas(exportContainer, {
-            backgroundColor: '#1a1208',
+            backgroundColor: '#f2f0eb',
             scale: 2,
             logging: false
         });
