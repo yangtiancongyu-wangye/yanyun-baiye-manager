@@ -749,7 +749,7 @@ async function handleSmartAssign() {
         return;
     }
 
-    showLoading('AI正在分析配队，请耐心等待...');
+    showSmartAssignLoading();
 
     try {
         const controller = new AbortController();
@@ -1004,6 +1004,104 @@ function confirmNewBatch() {
     alert(`已创建 ${newDate} 的百业战批次`);
 }
 
+// 智能配队专用 loading
+function showSmartAssignLoading() {
+    const messages = [
+        '正在统计各玩家的流派和特点',
+        '正在计算最合理的排兵布阵',
+        '岂曰无衣，与子同袍',
+        '王于兴师，修我戈矛。与子同仇！'
+    ];
+
+    const overlay = document.createElement('div');
+    overlay.id = 'loading-overlay';
+    overlay.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.75);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+    `;
+
+    const box = document.createElement('div');
+    box.style.cssText = `
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        width: 320px;
+        gap: 16px;
+    `;
+
+    // 进度条容器
+    const barWrap = document.createElement('div');
+    barWrap.style.cssText = `
+        width: 100%;
+        height: 6px;
+        background: rgba(255,255,255,0.2);
+        border-radius: 3px;
+        overflow: hidden;
+    `;
+    const bar = document.createElement('div');
+    bar.style.cssText = `
+        height: 100%;
+        width: 0%;
+        background: linear-gradient(90deg, #4facfe, #00f2fe);
+        border-radius: 3px;
+        transition: width 0.4s ease;
+    `;
+    barWrap.appendChild(bar);
+
+    // 文案
+    const label = document.createElement('div');
+    label.style.cssText = `
+        color: white;
+        font-size: 16px;
+        text-align: center;
+        min-height: 24px;
+        opacity: 1;
+        transition: opacity 0.3s ease;
+    `;
+    label.textContent = messages[0];
+
+    box.appendChild(barWrap);
+    box.appendChild(label);
+    overlay.appendChild(box);
+    document.body.appendChild(overlay);
+
+    // 进度条动画：匀速走到 90%，剩余留给真实完成
+    const totalDuration = messages.length * 1500; // 6000ms
+    const startTime = Date.now();
+    const progressTimer = setInterval(() => {
+        const elapsed = Date.now() - startTime;
+        const pct = Math.min(90, (elapsed / totalDuration) * 90);
+        bar.style.width = pct + '%';
+        if (pct >= 90) clearInterval(progressTimer);
+    }, 50);
+    overlay._progressTimer = progressTimer;
+    overlay._bar = bar;
+
+    // 文案轮播
+    let idx = 0;
+    const textTimer = setInterval(() => {
+        idx++;
+        if (idx >= messages.length) {
+            clearInterval(textTimer);
+            return;
+        }
+        label.style.opacity = '0';
+        setTimeout(() => {
+            label.textContent = messages[idx];
+            label.style.opacity = '1';
+        }, 300);
+    }, 1500);
+    overlay._textTimer = textTimer;
+}
+
 // 加载提示
 function showLoading(message) {
     const loading = document.createElement('div');
@@ -1029,7 +1127,15 @@ function showLoading(message) {
 function hideLoading() {
     const loading = document.getElementById('loading-overlay');
     if (loading) {
-        loading.remove();
+        if (loading._progressTimer) clearInterval(loading._progressTimer);
+        if (loading._textTimer) clearInterval(loading._textTimer);
+        if (loading._bar) {
+            loading._bar.style.transition = 'width 0.3s ease';
+            loading._bar.style.width = '100%';
+            setTimeout(() => loading.remove(), 350);
+        } else {
+            loading.remove();
+        }
     }
 }
 
