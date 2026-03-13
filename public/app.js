@@ -814,60 +814,106 @@ async function handleExportTeam() {
             left: -9999px;
             top: 0;
             width: 1600px;
-            padding: 50px;
-            background: linear-gradient(135deg, #f9f6f0 0%, #ede5d8 50%, #e8dcc8 100%);
-            font-family: 'KaiTi', 'STKaiti', 'Microsoft YaHei', serif;
-            position: relative;
+            padding: 60px 70px;
+            background: #1a1208;
+            font-family: 'KaiTi', 'STKaiti', 'SimSun', serif;
         `;
 
         const teamData = teams[currentBattleDate];
         let content = `
             <div style="position: relative;">
-                <!-- 装饰性水墨元素 -->
-                <div style="position: absolute; top: -40px; left: 50%; transform: translateX(-50%); width: 300px; height: 80px; background: radial-gradient(ellipse, rgba(139,69,19,0.1) 0%, transparent 70%);"></div>
-                <div style="position: absolute; top: 20px; left: 20px; width: 150px; height: 150px; border: 3px solid rgba(139,69,19,0.15); border-radius: 50%; opacity: 0.3;"></div>
-                <div style="position: absolute; top: 40px; right: 40px; width: 100px; height: 100px; border: 2px solid rgba(139,69,19,0.15); border-radius: 50%; opacity: 0.3;"></div>
+                <!-- 背景纹理层 -->
+                <div style="position: absolute; inset: 0; background:
+                    radial-gradient(ellipse at 15% 20%, rgba(180,120,40,0.08) 0%, transparent 50%),
+                    radial-gradient(ellipse at 85% 80%, rgba(180,120,40,0.06) 0%, transparent 50%),
+                    radial-gradient(ellipse at 50% 50%, rgba(100,60,10,0.15) 0%, transparent 80%);
+                    pointer-events: none;"></div>
+
+                <!-- 四角装饰 -->
+                <div style="position: absolute; top: -10px; left: -10px; width: 80px; height: 80px;
+                    border-top: 2px solid rgba(180,140,60,0.6); border-left: 2px solid rgba(180,140,60,0.6);"></div>
+                <div style="position: absolute; top: -10px; right: -10px; width: 80px; height: 80px;
+                    border-top: 2px solid rgba(180,140,60,0.6); border-right: 2px solid rgba(180,140,60,0.6);"></div>
+                <div style="position: absolute; bottom: -10px; left: -10px; width: 80px; height: 80px;
+                    border-bottom: 2px solid rgba(180,140,60,0.6); border-left: 2px solid rgba(180,140,60,0.6);"></div>
+                <div style="position: absolute; bottom: -10px; right: -10px; width: 80px; height: 80px;
+                    border-bottom: 2px solid rgba(180,140,60,0.6); border-right: 2px solid rgba(180,140,60,0.6);"></div>
 
                 <!-- 标题区域 -->
-                <div style="text-align: center; margin-bottom: 35px; position: relative; z-index: 1;">
-                    <div style="display: inline-block; position: relative;">
-                        <div style="position: absolute; top: -15px; left: -30px; width: 60px; height: 60px; background: radial-gradient(circle, rgba(212,165,116,0.3) 0%, transparent 70%);"></div>
-                        <div style="position: absolute; bottom: -15px; right: -30px; width: 60px; height: 60px; background: radial-gradient(circle, rgba(212,165,116,0.3) 0%, transparent 70%);"></div>
-                        <h1 style="font-size: 58px; color: #8b4513; margin: 0; letter-spacing: 12px; text-shadow: 3px 3px 6px rgba(0,0,0,0.15); font-weight: bold; position: relative;">加州理工学院百业战安排</h1>
+                <div style="text-align: center; margin-bottom: 50px; position: relative; z-index: 1; padding-top: 10px;">
+                    <!-- 顶部细线 -->
+                    <div style="margin: 0 auto 28px; display: flex; align-items: center; gap: 16px; justify-content: center;">
+                        <div style="flex: 1; max-width: 200px; height: 1px; background: linear-gradient(90deg, transparent, rgba(180,140,60,0.8));"></div>
+                        <div style="width: 6px; height: 6px; background: rgba(180,140,60,0.9); transform: rotate(45deg);"></div>
+                        <div style="width: 4px; height: 4px; background: rgba(180,140,60,0.6); transform: rotate(45deg);"></div>
+                        <div style="width: 6px; height: 6px; background: rgba(180,140,60,0.9); transform: rotate(45deg);"></div>
+                        <div style="flex: 1; max-width: 200px; height: 1px; background: linear-gradient(90deg, rgba(180,140,60,0.8), transparent);"></div>
                     </div>
-                    <div style="margin: 20px auto; width: 300px; height: 3px; background: linear-gradient(90deg, transparent, #d4a574 20%, #8b4513 50%, #d4a574 80%, transparent); position: relative;">
-                        <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 12px; height: 12px; background: #8b4513; border-radius: 50%; border: 2px solid #f9f6f0;"></div>
+
+                    <h1 style="font-size: 62px; color: #e8d5a0; margin: 0 0 6px; letter-spacing: 16px;
+                        text-shadow: 0 0 40px rgba(180,140,60,0.4), 2px 2px 0 rgba(0,0,0,0.8);
+                        font-weight: bold;">加州理工学院百业战安排</h1>
+
+                    <div style="margin: 22px auto; display: flex; align-items: center; gap: 12px; justify-content: center;">
+                        <div style="flex: 1; max-width: 280px; height: 1px; background: linear-gradient(90deg, transparent, rgba(180,140,60,0.5));"></div>
+                        <div style="font-size: 22px; color: #b8956a; letter-spacing: 8px;">${currentBattleDate}</div>
+                        <div style="flex: 1; max-width: 280px; height: 1px; background: linear-gradient(90deg, rgba(180,140,60,0.5), transparent);"></div>
                     </div>
-                    <p style="font-size: 26px; color: #a0826d; letter-spacing: 6px; margin: 0;">${currentBattleDate}</p>
                 </div>
         `;
 
         ['attack', 'defense'].forEach((brigade, brigadeIdx) => {
             const brigadeName = brigade === 'attack' ? '进攻大队' : '防守大队';
+            const brigadeColor = brigade === 'attack' ? '#c0392b' : '#2471a3';
+            const brigadeGlow = brigade === 'attack' ? 'rgba(192,57,43,0.3)' : 'rgba(36,113,163,0.3)';
             content += `
-                <div style="margin-bottom: 35px; position: relative;">
-                    <div style="position: absolute; top: -10px; left: -20px; width: 200px; height: 200px; background: radial-gradient(circle, rgba(139,69,19,0.05) 0%, transparent 70%); z-index: 0;"></div>
-                    <h2 style="text-align: center; font-size: 38px; color: #8b4513; margin-bottom: 25px; letter-spacing: 8px; position: relative; z-index: 1;">
-                        <span style="display: inline-block; padding: 10px 40px; border-top: 3px solid #d4a574; border-bottom: 3px solid #d4a574; background: linear-gradient(90deg, transparent, rgba(212,165,116,0.1) 20%, rgba(212,165,116,0.1) 80%, transparent);">${brigadeName}</span>
-                    </h2>
-                    <div style="display: flex; gap: 20px; position: relative; z-index: 1;">
+                <div style="margin-bottom: 40px; position: relative; z-index: 1;">
+                    <!-- 大队标题 -->
+                    <div style="text-align: center; margin-bottom: 24px;">
+                        <div style="display: inline-flex; align-items: center; gap: 20px;">
+                            <div style="width: 60px; height: 1px; background: linear-gradient(90deg, transparent, ${brigadeColor});"></div>
+                            <div style="width: 8px; height: 8px; background: ${brigadeColor}; transform: rotate(45deg); box-shadow: 0 0 8px ${brigadeGlow};"></div>
+                            <h2 style="font-size: 34px; color: #e8d5a0; margin: 0; letter-spacing: 10px;
+                                text-shadow: 0 0 20px ${brigadeGlow}, 1px 1px 0 rgba(0,0,0,0.9);">
+                                ${brigadeName}
+                            </h2>
+                            <div style="width: 8px; height: 8px; background: ${brigadeColor}; transform: rotate(45deg); box-shadow: 0 0 8px ${brigadeGlow};"></div>
+                            <div style="width: 60px; height: 1px; background: linear-gradient(90deg, ${brigadeColor}, transparent);"></div>
+                        </div>
+                    </div>
+                    <div style="display: flex; gap: 18px;">
             `;
 
             teamData[brigade].forEach((squad, squadIndex) => {
+                const squadNums = ['一', '二', '三'];
                 content += `
-                    <div style="flex: 1; background: linear-gradient(135deg, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0.7) 100%); border: 3px solid #d4a574; border-radius: 12px; padding: 15px; box-shadow: 0 8px 16px rgba(0,0,0,0.15), inset 0 1px 0 rgba(255,255,255,0.8); position: relative; overflow: hidden;">
-                        <div style="position: absolute; top: 0; right: 0; width: 80px; height: 80px; background: radial-gradient(circle at top right, rgba(212,165,116,0.2) 0%, transparent 70%);"></div>
-                        <h3 style="text-align: center; font-size: 26px; color: #8b4513; margin-bottom: 15px; letter-spacing: 4px; padding-bottom: 8px; border-bottom: 2px solid #d4a574; position: relative;">
-                            小队${squadIndex + 1}
-                            <div style="position: absolute; bottom: -6px; left: 50%; transform: translateX(-50%); width: 8px; height: 8px; background: #8b4513; border-radius: 50%; border: 2px solid #f9f6f0;"></div>
+                    <div style="flex: 1; background: linear-gradient(160deg, rgba(40,28,10,0.95) 0%, rgba(28,18,6,0.98) 100%);
+                        border: 1px solid rgba(180,140,60,0.3);
+                        border-radius: 4px; padding: 20px 18px;
+                        box-shadow: 0 4px 24px rgba(0,0,0,0.6), inset 0 1px 0 rgba(180,140,60,0.1);
+                        position: relative; overflow: hidden;">
+                        <!-- 卡片内角装饰 -->
+                        <div style="position: absolute; top: 8px; left: 8px; width: 20px; height: 20px;
+                            border-top: 1px solid rgba(180,140,60,0.4); border-left: 1px solid rgba(180,140,60,0.4);"></div>
+                        <div style="position: absolute; top: 8px; right: 8px; width: 20px; height: 20px;
+                            border-top: 1px solid rgba(180,140,60,0.4); border-right: 1px solid rgba(180,140,60,0.4);"></div>
+                        <div style="position: absolute; bottom: 8px; left: 8px; width: 20px; height: 20px;
+                            border-bottom: 1px solid rgba(180,140,60,0.4); border-left: 1px solid rgba(180,140,60,0.4);"></div>
+                        <div style="position: absolute; bottom: 8px; right: 8px; width: 20px; height: 20px;
+                            border-bottom: 1px solid rgba(180,140,60,0.4); border-right: 1px solid rgba(180,140,60,0.4);"></div>
+
+                        <h3 style="text-align: center; font-size: 24px; color: #e8d5a0; margin: 0 0 16px;
+                            letter-spacing: 6px; padding-bottom: 12px;
+                            border-bottom: 1px solid rgba(180,140,60,0.3); position: relative;">
+                            第${squadNums[squadIndex]}小队
                         </h3>
                         <table style="width: 100%; border-collapse: collapse;">
                             <thead>
-                                <tr style="background: linear-gradient(135deg, rgba(212,165,116,0.4) 0%, rgba(212,165,116,0.25) 100%);">
-                                    <th style="padding: 8px 6px; font-size: 16px; color: #8b4513; border-bottom: 2px solid #d4a574; text-align: left; font-weight: bold;">人员</th>
-                                    <th style="padding: 8px 6px; font-size: 16px; color: #8b4513; border-bottom: 2px solid #d4a574; font-weight: bold;">流派</th>
-                                    <th style="padding: 8px 6px; font-size: 16px; color: #8b4513; border-bottom: 2px solid #d4a574; font-weight: bold;">开局安排</th>
-                                    <th style="padding: 8px 6px; font-size: 16px; color: #8b4513; border-bottom: 2px solid #d4a574; font-weight: bold;">后续安排</th>
+                                <tr style="background: rgba(180,140,60,0.12);">
+                                    <th style="padding: 9px 8px; font-size: 15px; color: #b8956a; border-bottom: 1px solid rgba(180,140,60,0.25); text-align: left; font-weight: normal; letter-spacing: 2px;">人员</th>
+                                    <th style="padding: 9px 8px; font-size: 15px; color: #b8956a; border-bottom: 1px solid rgba(180,140,60,0.25); font-weight: normal; letter-spacing: 2px;">流派</th>
+                                    <th style="padding: 9px 8px; font-size: 15px; color: #b8956a; border-bottom: 1px solid rgba(180,140,60,0.25); font-weight: normal; letter-spacing: 2px;">开局安排</th>
+                                    <th style="padding: 9px 8px; font-size: 15px; color: #b8956a; border-bottom: 1px solid rgba(180,140,60,0.25); font-weight: normal; letter-spacing: 2px;">后续安排</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -875,20 +921,20 @@ async function handleExportTeam() {
 
                 for (let i = 0; i < 5; i++) {
                     const member = squad[i];
-                    const bgColor = i % 2 === 0 ? 'rgba(255,255,255,0.5)' : 'rgba(248,246,240,0.5)';
+                    const rowBg = i % 2 === 0 ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.15)';
                     if (member) {
                         content += `
-                            <tr style="background: ${bgColor}; border-bottom: 1px solid #e8dcc8;">
-                                <td style="padding: 8px 6px; font-size: 16px; color: #5d4037; font-weight: bold;">${member.id}</td>
-                                <td style="padding: 8px 6px; font-size: 13px; color: #6d4c41; text-align: center;">${(member.professions || []).join('、')}</td>
-                                <td style="padding: 8px 6px; font-size: 14px; color: #5d4037; line-height: 1.4;">${member.startPlan || '-'}</td>
-                                <td style="padding: 8px 6px; font-size: 14px; color: #5d4037; line-height: 1.4;">${member.followPlan || '-'}</td>
+                            <tr style="background: ${rowBg}; border-bottom: 1px solid rgba(180,140,60,0.1);">
+                                <td style="padding: 9px 8px; font-size: 17px; color: #e8d5a0; font-weight: bold; letter-spacing: 1px;">${member.id}</td>
+                                <td style="padding: 9px 8px; font-size: 13px; color: #c4a882; text-align: center; line-height: 1.5;">${(member.professions || []).join('、')}</td>
+                                <td style="padding: 9px 8px; font-size: 14px; color: #d4c090; line-height: 1.5;">${member.startPlan || '—'}</td>
+                                <td style="padding: 9px 8px; font-size: 14px; color: #d4c090; line-height: 1.5;">${member.followPlan || '—'}</td>
                             </tr>
                         `;
                     } else {
                         content += `
-                            <tr style="background: ${bgColor}; border-bottom: 1px solid #e8dcc8;">
-                                <td colspan="4" style="padding: 8px 6px; font-size: 14px; color: #bcaaa4; text-align: center; font-style: italic;">待分配对应玩家</td>
+                            <tr style="background: ${rowBg}; border-bottom: 1px solid rgba(180,140,60,0.1);">
+                                <td colspan="4" style="padding: 9px 8px; font-size: 14px; color: rgba(180,140,60,0.3); text-align: center; letter-spacing: 2px;">虚位以待</td>
                             </tr>
                         `;
                     }
@@ -906,8 +952,12 @@ async function handleExportTeam() {
 
         content += `
                 <!-- 底部装饰 -->
-                <div style="margin-top: 40px; text-align: center;">
-                    <div style="display: inline-block; width: 400px; height: 2px; background: linear-gradient(90deg, transparent, #d4a574, transparent);"></div>
+                <div style="margin-top: 44px; text-align: center; position: relative; z-index: 1;">
+                    <div style="display: flex; align-items: center; gap: 16px; justify-content: center;">
+                        <div style="flex: 1; max-width: 300px; height: 1px; background: linear-gradient(90deg, transparent, rgba(180,140,60,0.5));"></div>
+                        <div style="font-size: 13px; color: rgba(180,140,60,0.4); letter-spacing: 4px;">燕云百业</div>
+                        <div style="flex: 1; max-width: 300px; height: 1px; background: linear-gradient(90deg, rgba(180,140,60,0.5), transparent);"></div>
+                    </div>
                 </div>
             </div>
         `;
@@ -916,7 +966,7 @@ async function handleExportTeam() {
         document.body.appendChild(exportContainer);
 
         const canvas = await html2canvas(exportContainer, {
-            backgroundColor: '#f9f6f0',
+            backgroundColor: '#1a1208',
             scale: 2,
             logging: false
         });
