@@ -826,18 +826,22 @@ async function handleExportTeam() {
 
         // 全局统一字号：遍历所有成员找最长文字，算出统一字号和行高
         let maxPlanLen = 0;
+        let maxIdLen = 0;
         ['attack', 'defense'].forEach(brigade => {
             teamData[brigade].forEach(squad => {
                 squad.forEach(member => {
                     if (!member) return;
                     maxPlanLen = Math.max(maxPlanLen, (member.startPlan || '').length, (member.followPlan || '').length);
+                    maxIdLen = Math.max(maxIdLen, (member.id || '').length);
                 });
             });
         });
         const planFontSize = maxPlanLen <= 12 ? 14 : maxPlanLen <= 24 ? 12 : maxPlanLen <= 36 ? 10 : 9;
-        // 行高：字号 * 行距 * 最多行数 + 上下padding
-        const maxLines = maxPlanLen <= 12 ? 1 : 2;
-        const rowHeight = planFontSize * 1.4 * maxLines + 18;
+        // 玩家名字号：列宽约18%*卡片宽，估算可容纳字数，超出则缩小
+        const idFontSize = maxIdLen <= 4 ? 17 : maxIdLen <= 6 ? 15 : maxIdLen <= 8 ? 13 : 11;
+        // 行高：取 plan 和 id 两者所需行数的最大值
+        const maxLines = Math.max(maxPlanLen <= 12 ? 1 : 2, maxIdLen <= 6 ? 1 : 2);
+        const rowHeight = Math.max(planFontSize, idFontSize) * 1.4 * maxLines + 18;
 
         let content = `
             <div style="position: relative;">
@@ -946,7 +950,7 @@ async function handleExportTeam() {
                     if (member) {
                         content += `
                             <tr style="background: ${rowBg}; border-bottom: 1px dashed #999;">
-                                <td style="padding: 0 6px; height: ${rowHeight}px; font-size: 17px; color: #1a1a1a; font-weight: bold; letter-spacing: 1px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${member.id}</td>
+                                <td style="padding: 0 6px; height: ${rowHeight}px; font-size: ${idFontSize}px; color: #1a1a1a; font-weight: bold; letter-spacing: 1px; text-align: center; white-space: normal; word-break: break-all; line-height: 1.4;">${member.id}</td>
                                 <td style="padding: 0 6px; height: ${rowHeight}px; font-size: 14px; color: #333; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${(member.professions || []).join('、')}</td>
                                 <td style="padding: 0 6px; height: ${rowHeight}px; font-size: ${planFontSize}px; color: #333; text-align: center; white-space: normal; word-break: break-all; line-height: 1.4;">${member.startPlan || '—'}</td>
                                 <td style="padding: 0 6px; height: ${rowHeight}px; font-size: ${planFontSize}px; color: #333; text-align: center; white-space: normal; word-break: break-all; line-height: 1.4;">${member.followPlan || '—'}</td>
