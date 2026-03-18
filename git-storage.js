@@ -26,14 +26,21 @@ async function commitData(message = '自动保存数据') {
         }
 
         // 添加数据文件
-        execSync('git add data/players.json data/teams.json');
+        execSync('git add data/players.json data/teams.json data/lotteries.json');
 
         // 提交
         const timestamp = new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' });
         execSync(`git commit -m "${message} - ${timestamp}"`);
 
+        // 先 pull rebase 再推送，避免代码更新导致冲突
+        try {
+            execSync('git pull --rebase origin main', { timeout: 15000 });
+        } catch (pullErr) {
+            console.warn('pull rebase 失败，尝试直接推送:', pullErr.message);
+        }
+
         // 推送到 GitHub
-        execSync('git push origin main', { timeout: 10000 });
+        execSync('git push origin main', { timeout: 15000 });
 
         console.log('✓ 数据已自动保存到 GitHub');
         return { success: true, message: '数据已保存' };
