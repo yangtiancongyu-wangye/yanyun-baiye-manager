@@ -230,8 +230,38 @@ app.post('/api/smart-assign', async (req, res) => {
 
         console.log('开始智能配队，玩家数量:', players.length);
 
+        // 读取历史配队数据作为参考
+        let historyContext = '';
+        try {
+            const allTeams = JSON.parse(fs.readFileSync(TEAMS_FILE, 'utf8'));
+            const historyDates = Object.keys(allTeams).sort().slice(-5); // 最近5个批次
+            const historyExamples = [];
+            for (const date of historyDates) {
+                const t = allTeams[date];
+                const squads = [];
+                ['attack', 'defense'].forEach(side => {
+                    const sideName = side === 'attack' ? '进攻' : '防守';
+                    (t[side] || []).forEach((squad, idx) => {
+                        if (!squad || squad.length === 0) return;
+                        const members = squad.filter(Boolean).map(m =>
+                            `${m.id}(${(m.professions||[]).join('/')})${m.startPlan ? ' 开局:'+m.startPlan : ''}${m.followPlan ? ' 后续:'+m.followPlan : ''}`
+                        ).join('、');
+                        squads.push(`  ${sideName}${idx+1}队: ${members}`);
+                    });
+                });
+                if (squads.length > 0) {
+                    historyExamples.push(`【${date}】\n${squads.join('\n')}`);
+                }
+            }
+            if (historyExamples.length > 0) {
+                historyContext = `\n\n【历史配队参考（人工调整后的真实数据，请重点参考队伍组合、位置分配和安排策略）】\n${historyExamples.join('\n\n')}`;
+            }
+        } catch (e) {
+            console.warn('读取历史配队数据失败:', e.message);
+        }
+
         // 调用Claude API
-        const prompt = `你是一个战略配队专家，基于对流派和玩家信息的理解，通过我给你的玩家ID和流派结合下方规则，进行合理的队伍分配。
+        const prompt = `你是一个战略配队专家，基于对流派和玩家信息的理解，通过我给你的玩家ID和流派结合下方规则，进行合理的队伍分配。${historyContext}
 
 玩家列表：
 ${players.map(p => {
