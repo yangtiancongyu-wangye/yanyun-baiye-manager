@@ -398,6 +398,52 @@
       [],
       []
     ],
-    "availablePlayers": []
+    "availablePlayers": [
+      {
+        "id": "风千杨",
+        "professions": [
+          "十方陌",
+          "陌刀"
+        ],
+        "uid": "u908vfhgqn"
+      },
+      {
+        "id": "常伴明月",
+        "professions": [
+          "陌奶",
+          "陌刀风扇"
+        ],
+        "uid": "urusanww3o"
+      },
+      {
+        "id": "攸风",
+        "professions": [
+          "无名"
+        ],
+        "uid": "ucif6sn38j"
+      },
+      {
+        "id": "好婉",
+        "professions": [
+          "尘尘",
+          "尘"
+        ],
+        "uid": "uat3h6my82"
+      },
+      {
+        "id": "青未觉",
+        "professions": [
+          "钩钩"
+        ],
+        "uid": "uf13hbhmt8"
+      },
+      {
+        "id": "今早不想起",
+        "professions": [
+          "钩钩"
+        ],
+        "uid": "udch006117"
+      }
+    ]
   }
 }
