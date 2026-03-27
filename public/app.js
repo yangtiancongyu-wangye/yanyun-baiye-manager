@@ -137,9 +137,7 @@ function openPlayerModal(playerIndex = null) {
         document.getElementById('player-notes').value = player.notes || '';
 
         const select = document.getElementById('player-professions');
-        Array.from(select.options).forEach(option => {
-            option.selected = player.professions.includes(option.value);
-        });
+        select.value = (player.professions && player.professions[0]) || '';
 
         playerForm.dataset.editIndex = playerIndex;
     } else {
@@ -158,19 +156,31 @@ function handlePlayerSubmit(e) {
 
     const id = document.getElementById('player-id').value.trim();
     const select = document.getElementById('player-professions');
-    const professions = Array.from(select.selectedOptions).map(opt => opt.value);
+    const profession = select.value;
     const notes = document.getElementById('player-notes').value.trim();
 
-    if (professions.length === 0 || professions.length > 2) {
-        alert('请选择1-2个职业');
+    if (!profession) {
+        alert('请选择流派');
         return;
     }
 
-    const player = { id, professions, notes };
+    const player = { id, professions: [profession], notes };
 
     if (playerForm.dataset.editIndex !== undefined) {
+        // 编辑时保留原有uid
+        const existing = players[parseInt(playerForm.dataset.editIndex)];
+        if (existing.uid) player.uid = existing.uid;
+        const oldId = existing.id;
         players[parseInt(playerForm.dataset.editIndex)] = player;
+        // 同步到配队数据
+        syncPlayerToTeams(oldId, player);
+        // 同步到报名数据（id变更时）
+        if (oldId !== player.id) {
+            syncPlayerIdToLotteries(oldId, player.id);
+        }
     } else {
+        // 新增时生成uid（服务端会兜底，前端也生成以确保本地一致性）
+        player.uid = 'u' + Math.random().toString(36).substring(2, 11);
         players.push(player);
     }
 
@@ -181,6 +191,45 @@ function handlePlayerSubmit(e) {
 
 function editPlayer(index) {
     openPlayerModal(index);
+}
+
+// 同步玩家变更到所有配队数据
+function syncPlayerToTeams(oldId, newPlayer) {
+    let changed = false;
+    Object.keys(teams).forEach(date => {
+        ['attack', 'defense'].forEach(side => {
+            (teams[date][side] || []).forEach(squad => {
+                (squad || []).forEach(member => {
+                    if (member && member.id === oldId) {
+                        member.id = newPlayer.id;
+                        member.professions = newPlayer.professions.slice();
+                        changed = true;
+                    }
+                });
+            });
+        });
+    });
+    if (changed) {
+        saveTeams();
+        if (document.querySelector('[data-page="team"]').classList.contains('active')) {
+            renderTeams(currentBattleDate);
+        }
+    }
+}
+
+// 同步玩家ID变更到报名数据
+function syncPlayerIdToLotteries(oldId, newId) {
+    let changed = false;
+    lotteries.forEach(lottery => {
+        if (lottery.playerIds) {
+            const idx = lottery.playerIds.indexOf(oldId);
+            if (idx !== -1) {
+                lottery.playerIds[idx] = newId;
+                changed = true;
+            }
+        }
+    });
+    if (changed) saveLotteries();
 }
 
 function deletePlayer(index) {
@@ -946,12 +995,21 @@ async function handleExportTeam() {
 
                 for (let i = 0; i < 5; i++) {
                     const member = squad[i];
-                    const rowBg = i % 2 === 0 ? 'transparent' : 'rgba(0,0,0,0.02)';
+                    const prof = (member && member.professions && member.professions[0]) || '';
+                    let rowBg;
+                    if (prof.includes('陌')) {
+                        rowBg = 'rgba(255, 165, 0, 0.25)';
+                    } else if (prof.includes('奶')) {
+                        rowBg = 'rgba(0, 160, 80, 0.20)';
+                    } else {
+                        rowBg = i % 2 === 0 ? 'transparent' : 'rgba(0,0,0,0.02)';
+                    }
+                    const profColor = (!prof || prof.includes('陌') || prof.includes('奶')) ? '#333' : '#1565C0';
                     if (member) {
                         content += `
                             <tr style="background: ${rowBg}; border-bottom: 1px dashed #999;">
                                 <td style="padding: 0 6px; height: ${rowHeight}px; font-size: ${idFontSize}px; color: #1a1a1a; font-weight: bold; letter-spacing: 1px; text-align: center; white-space: normal; word-break: break-all; line-height: 1.4;">${member.id}</td>
-                                <td style="padding: 0 6px; height: ${rowHeight}px; font-size: 14px; color: #333; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${(member.professions || []).join('、')}</td>
+                                <td style="padding: 0 6px; height: ${rowHeight}px; font-size: 14px; color: ${profColor}; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${(member.professions || []).join('、')}</td>
                                 <td style="padding: 0 6px; height: ${rowHeight}px; font-size: ${planFontSize}px; color: #333; text-align: center; white-space: normal; word-break: break-all; line-height: 1.4;">${member.startPlan || '—'}</td>
                                 <td style="padding: 0 6px; height: ${rowHeight}px; font-size: ${planFontSize}px; color: #333; text-align: center; white-space: normal; word-break: break-all; line-height: 1.4;">${member.followPlan || '—'}</td>
                             </tr>

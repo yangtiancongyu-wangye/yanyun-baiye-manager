@@ -5,8 +5,13 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const sharp = require('sharp');
+const Tesseract = require('tesseract.js');
 const { initializeData } = require('./init-data');
 const { pullData, debouncedCommit } = require('./git-storage');
+
+function generateUid() {
+    return 'u' + Math.random().toString(36).substring(2, 11);
+}
 require('dotenv').config();
 
 const app = express();
@@ -129,7 +134,111 @@ app.post('/api/ocr-players', async (req, res) => {
     }
 });
 
-// OCR图片识别API - 导入报名玩家
+// 编辑距离（Levenshtein）用于模糊匹配
+function levenshtein(a, b) {
+    const m = a.length, n = b.length;
+    const dp = Array.from({ length: m + 1 }, (_, i) => [i]);
+    for (let j = 0; j <= n; j++) dp[0][j] = j;
+    for (let i = 1; i <= m; i++)
+        for (let j = 1; j <= n; j++)
+            dp[i][j] = a[i-1] === b[j-1] ? dp[i-1][j-1]
+                : 1 + Math.min(dp[i-1][j], dp[i][j-1], dp[i-1][j-1]);
+    return dp[m][n];
+}
+
+// 从OCR原始文本中模糊匹配已知玩家列表
+function fuzzyMatchPlayers(rawText, playersList) {
+    if (!playersList || playersList.length === 0) return [];
+    const lines = rawText.split(/[\n\r]+/).map(l => l.trim()).filter(Boolean);
+    const matched = new Set();
+    for (const line of lines) {
+        // 先尝试直接包含
+        for (const name of playersList) {
+            if (line.includes(name)) {
+                matched.add(name);
+            }
+        }
+        // 再对每个词段做编辑距离匹配
+        const segments = line.split(/[\s,，、|｜/\\]+/).filter(s => s.length >= 2);
+        for (const seg of segments) {
+            let best = null, bestDist = Infinity;
+            for (const name of playersList) {
+                const dist = levenshtein(seg, name);
+                // 容忍度：每个字符最多1个错误，最多允许2个错误
+                const threshold = Math.min(2, Math.floor(name.length / 2));
+                if (dist <= threshold && dist < bestDist) {
+                    bestDist = dist;
+                    best = name;
+                }
+            }
+            if (best) matched.add(best);
+        }
+    }
+    return Array.from(matched);
+}
+
+// 多级强力模糊匹配：将原始OCR文本与玩家名单对比
+function strongFuzzyMatch(rawText, playersList) {
+    if (!playersList || playersList.length === 0) return [];
+    const matched = new Set();
+
+    // OCR常见错字映射（Tesseract中文识别常见错误）
+    const ocrFixes = {
+        '莫':'慕','逢':'辞','业':'辞','哮':'辞','藤':'慕','噌':'辞',
+        '关':'糊','壹':'坨','潇':'宵','滿':'宵','滨':'擎','攻':'长',
+        '移':'鬼','受':'曼','畦':'哇','称':'仿','蔗':'蔗','华':'蔗',
+        '于':'千','翅':'蟑','沉':'觉','胺':'晏','妇':'郎','困':'斩',
+        '巡':'婉','婷':'婉','奸':'好','妹':'婉','贿':'蟑','垒':'螂',
+        '素':'墨','渊':'渊','縮':'蟑','洲':'渊','示':'未','學':'觉',
+        '檔':'极','紅':'红','豐':'丰','况':'沉','机':'烟',
+        '新':'斩','即':'郎','光':'兆','妥':'晏','天':'灵','蜂':'蟑','星':'螂',
+        '汗':'擎','纹':'校','幕':'慕','噶':'喵','灿':'糊','入':'仿','穗':'穗',
+        '凍':'兆','際':'兆','產':'丰','覺':'觉','斷':'斩','受':'晏'
+    };
+    let fixedText = rawText;
+    for (const [wrong, right] of Object.entries(ocrFixes)) {
+        fixedText = fixedText.replace(new RegExp(wrong, 'g'), right);
+    }
+
+    // 把原始文本按各种分隔符切分为候选片段
+    const lines = fixedText.split(/[\n\r]+/);
+    const candidates = new Set();
+    for (const line of lines) {
+        const segs = line.split(/[\s,，、|｜/\\:：\t]+/);
+        for (const seg of segs) {
+            const s = seg.trim();
+            if (s.length >= 2) candidates.add(s);
+        }
+        const ltrim = line.trim();
+        if (ltrim.length >= 2) candidates.add(ltrim);
+    }
+
+    // 对每个玩家名，在候选中做多级匹配
+    for (const name of playersList) {
+        if (!name || name.length === 0) continue;
+        // 1. 原文直接包含玩家名（最强，精确）
+        if (fixedText.includes(name)) { matched.add(name); continue; }
+        // 2. 候选片段直接包含玩家名（候选比玩家名长，包含玩家名作为子串）
+        let found = false;
+        for (const cand of candidates) {
+            if (cand.includes(name)) {
+                matched.add(name); found = true; break;
+            }
+        }
+        if (found) continue;
+        // 3. 编辑距离（放宽：3字及以下允许1个差异，4字及以上允许2个差异）
+        const maxDist = name.length <= 3 ? 1 : 2;
+        for (const cand of candidates) {
+            if (Math.abs(cand.length - name.length) > 2) continue;
+            if (levenshtein(cand, name) <= maxDist) {
+                matched.add(name); break;
+            }
+        }
+    }
+    return Array.from(matched);
+}
+
+// OCR图片识别API - 导入报名玩家（使用Claude Vision，高准确率）
 app.post('/api/ocr-registration', upload.single('image'), async (req, res) => {
     try {
         if (!req.file) {
@@ -139,75 +248,58 @@ app.post('/api/ocr-registration', upload.single('image'), async (req, res) => {
         // 获取人才库玩家列表
         const playersList = req.body.playersList ? JSON.parse(req.body.playersList) : [];
 
-        // 构建玩家列表提示
-        let playersHint = '';
-        if (playersList && playersList.length > 0) {
-            playersHint = `\n\n【人才库玩家列表】请严格从以下列表中匹配识别结果：\n${playersList.join('、')}`;
-        }
+        // 设置Tesseract语言包路径（traineddata在项目根目录）
+        const tessDataDir = path.resolve(__dirname);
+        process.env.TESSDATA_PREFIX = tessDataDir;
 
-        const prompt = `你是一个OCR识别助手。请识别这张图片中的玩家ID列表。这是报名玩家的名单，头像右侧或者下方一般是玩家ID。
+        // 双引擎OCR并行：chi_sim + chi_tra，高清预处理
+        const tessBuffer = await sharp(req.file.buffer)
+            .resize({ width: 2400, withoutEnlargement: false })
+            .grayscale()
+            .normalise()
+            .sharpen({ sigma: 2 })
+            .png()
+            .toBuffer();
 
-识别要求：
-1. 仔细识别每个中文字符，确保准确无误
-2. 玩家ID通常是2-4个中文字符
-3. 必须从人才库列表中匹配，不要识别出列表之外的名字
-4. 如果图片模糊，请根据字形和人才库列表推断最接近的名字${playersHint}
+        console.log('开始Tesseract OCR（chi_sim+chi_tra）...');
+        const [simResult, traResult] = await Promise.allSettled([
+            Tesseract.recognize(tessBuffer, 'chi_sim', { logger: () => {}, langPath: tessDataDir }),
+            Tesseract.recognize(tessBuffer, 'chi_tra', { logger: () => {}, langPath: tessDataDir })
+        ]);
 
-请提取所有玩家ID，返回JSON数组格式：
-["玩家ID1", "玩家ID2", "玩家ID3", ...]
+        const simText = simResult.status === 'fulfilled' ? simResult.value.data.text : '';
+        const traText = traResult.status === 'fulfilled' ? traResult.value.data.text : '';
+        console.log('chi_sim结果:', simText);
+        console.log('chi_tra结果:', traText);
 
-重要：只返回JSON数组，不要添加任何解释或其他文字。`;
-
-        // 压缩图片
-        const compressedBuffer = await compressImage(req.file.buffer);
-
-        // 将压缩后的图片转为base64（Claude API需要）
-        const imageBase64 = `data:image/jpeg;base64,${compressedBuffer.toString('base64')}`;
-
-        const response = await axios.post(
-            'https://cursor.scihub.edu.kg/api/v1/chat/completions',
-            {
-                model: 'claude-sonnet-4-6',
-                max_tokens: 4096,
-                messages: [{
-                    role: 'user',
-                    content: [
-                        { type: 'image_url', image_url: { url: imageBase64 } },
-                        { type: 'text', text: prompt }
-                    ]
-                }]
-            },
-            {
-                headers: {
-                    'Authorization': 'Bearer cr_885a369a5301a04d886ad0af117dd27a90cbbb2b96fedd7ce1bd64aebf38369a',
-                    'Content-Type': 'application/json'
-                },
-                timeout: 60000
+        // 合并两路文字（去除Tesseract在汉字间加的多余空格 + 繁→简转换）
+        function cleanTessText(t) {
+            // 高频繁体→简体映射（针对玩家ID常见字）
+            const t2s = {'獨':'独','孤':'孤','擎':'擎','燕':'燕','長':'长','費':'费','曼':'曼','塗':'涂','墓':'慕','苔':'辞','師':'师','兄':'兄','風':'风','說':'说','條':'条','埋':'震','霸':'霸','彷':'仿','蔗':'蔗','滿':'潇','夜':'夜','地':'坨','糊':'糊','石':'石','君':'君','祝':'祝','攻':'攻','束':'慕','矢':'辞','此':'此','吵':'吵','滨':'擎','攻':'长','辣':'辣','點':'点','讓':'让','寺':'寺','聞':'闻','信':'信','端':'端','避':'避','友':'友','臣':'臣','滲':'渗','圖':'图','責':'责','曝':'曝','哺':'哺','訪':'访','半':'半','衣':'衣','例':'例','會':'会','家':'家','舍':'舍','伍':'伍','格':'格','僅':'仅','攻':'攻'};
+            let s = t;
+            for (const [tra, sim] of Object.entries(t2s)) s = s.replace(new RegExp(tra, 'g'), sim);
+            // 循环去除汉字间空格（直到不再变化）
+            let prev = '';
+            while (prev !== s) {
+                prev = s;
+                s = s.replace(/([\u4e00-\u9fff])\s+([\u4e00-\u9fff])/g, '$1$2');
             }
-        );
+            return s;
+        }
+        const rawText = cleanTessText(simText) + '\n' + cleanTessText(traText);
 
-        // 检查响应是否有效
-        if (!response.data || !response.data.choices || !response.data.choices[0] || !response.data.choices[0].message) {
-            throw new Error('API返回数据格式错误');
+        // 第二步：服务端多级强力模糊匹配
+        let playerIds = [];
+        if (playersList.length > 0) {
+            playerIds = strongFuzzyMatch(rawText, playersList);
+        } else {
+            playerIds = claudeText.split(/[\n\r]+/).map(l => l.trim()).filter(l => l.length >= 2);
         }
 
-        let aiResponse = response.data.choices[0].message.content;
-        console.log('AI原始响应:', aiResponse);
-
-        // 清理响应文本
-        aiResponse = aiResponse.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-
-        // 检查是否是错误消息
-        if (aiResponse.startsWith("I can't") || aiResponse.startsWith("I cannot")) {
-            throw new Error('AI拒绝处理请求: ' + aiResponse);
-        }
-
-        const playerIds = JSON.parse(aiResponse);
-
+        console.log('Step2 匹配结果:', playerIds);
         res.json({ success: true, playerIds });
     } catch (error) {
-        console.error('OCR识别错误:', error.response?.data || error.message);
-
+        console.error('OCR识别错误:', error.message);
         res.json({
             success: false,
             error: error.message || '识别失败，请重试'
@@ -234,6 +326,12 @@ app.post('/api/smart-assign', async (req, res) => {
         let historyContext = '';
         try {
             const allTeams = JSON.parse(fs.readFileSync(TEAMS_FILE, 'utf8'));
+            const allPlayers = JSON.parse(fs.readFileSync(PLAYERS_FILE, 'utf8'));
+            // 构建 uid -> 当前昵称 映射
+            const uidToName = {};
+            for (const p of allPlayers) {
+                if (p.uid) uidToName[p.uid] = p.id;
+            }
             const historyDates = Object.keys(allTeams).sort().slice(-5); // 最近5个批次
             const historyExamples = [];
             for (const date of historyDates) {
@@ -243,9 +341,11 @@ app.post('/api/smart-assign', async (req, res) => {
                     const sideName = side === 'attack' ? '进攻' : '防守';
                     (t[side] || []).forEach((squad, idx) => {
                         if (!squad || squad.length === 0) return;
-                        const members = squad.filter(Boolean).map(m =>
-                            `${m.id}(${(m.professions||[]).join('/')})${m.startPlan ? ' 开局:'+m.startPlan : ''}${m.followPlan ? ' 后续:'+m.followPlan : ''}`
-                        ).join('、');
+                        const members = squad.filter(Boolean).map(m => {
+                            // 优先用uid查找当前昵称，回退到历史记录的id
+                            const currentName = (m.uid && uidToName[m.uid]) ? uidToName[m.uid] : m.id;
+                            return `${currentName}(${(m.professions||[]).join('/')})${m.startPlan ? ' 开局:'+m.startPlan : ''}${m.followPlan ? ' 后续:'+m.followPlan : ''}`;
+                        }).join('、');
                         squads.push(`  ${sideName}${idx+1}队: ${members}`);
                     });
                 });
@@ -280,9 +380,9 @@ ${players.map(p => {
 - 鸢鸢/拳头 = 天志垂象+千机索天（破竹·鸢）
 
 【纵向职能：1-5号位身份锚点】
-1号位（核心领队/坦克）：肉陌、陌刀、陌双等高生存流派，负责吃伤害、占点、人墙
-2-4号位（主力输出/控制）：无名、拳头、尘、九九等，负责推塔/打鹅/野区截杀
-5号位（绝对续航）：固定纯奶（霖霖），确保小队续航
+1号位（核心领队/坦克）：肉陌、陌刀、陌双、十方陌、陌刀风扇等高生存流派，负责吃伤害、打控制、搬树等
+2-4号位（主力输出/控制）：无名、拳头、尘、九九、双刀等，负责推塔/打鹅/野区截杀，击杀对方输出和奶妈
+5号位（绝对续航）：固定纯奶（霖霖）、双扇等确保小队续航
 
 【进攻团配队原则】
 1队（主攻手）：1号位肉陌+2-4号位输出+5号位纯奶
@@ -445,6 +545,24 @@ const LOTTERIES_FILE = path.join(DATA_DIR, 'lotteries.json');
     if (!fs.existsSync(LOTTERIES_FILE)) {
         fs.writeFileSync(LOTTERIES_FILE, JSON.stringify([], null, 2));
     }
+
+    // 为没有uid的玩家自动分配uid（迁移旧数据）
+    try {
+        const playersData = JSON.parse(fs.readFileSync(PLAYERS_FILE, 'utf8'));
+        let migrated = false;
+        for (const p of playersData) {
+            if (!p.uid) {
+                p.uid = generateUid();
+                migrated = true;
+            }
+        }
+        if (migrated) {
+            fs.writeFileSync(PLAYERS_FILE, JSON.stringify(playersData, null, 2));
+            console.log('已为玩家自动分配uid');
+        }
+    } catch (e) {
+        console.error('uid迁移失败:', e);
+    }
 })();
 
 // 获取玩家数据
@@ -462,6 +580,10 @@ app.get('/api/players', (req, res) => {
 app.post('/api/players', (req, res) => {
     try {
         const players = req.body;
+        // 确保每个玩家都有uid
+        for (const p of players) {
+            if (!p.uid) p.uid = generateUid();
+        }
         fs.writeFileSync(PLAYERS_FILE, JSON.stringify(players, null, 2));
 
         // 自动提交到 GitHub（5秒防抖）
