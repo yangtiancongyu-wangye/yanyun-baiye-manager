@@ -398,6 +398,101 @@
       [],
       []
     ],
-    "availablePlayers": []
+    "availablePlayers": [
+      {
+        "id": "鬼公仔",
+        "professions": [
+          "陌双"
+        ],
+        "uid": "uvnnajm97s"
+      },
+      {
+        "id": "震霸天",
+        "professions": [
+          "陌九",
+          "九九"
+        ],
+        "uid": "uyxyqr88v0"
+      },
+      {
+        "id": "费曼",
+        "professions": [
+          "无名",
+          "陌刀风扇"
+        ],
+        "uid": "ud7zxciyzl"
+      },
+      {
+        "id": "柿水",
+        "professions": [
+          "无名"
+        ],
+        "uid": "ugqr1ngpn6"
+      },
+      {
+        "id": "宛有",
+        "professions": [
+          "无名"
+        ],
+        "uid": "u6jqkqqrci"
+      },
+      {
+        "id": "三石",
+        "professions": [
+          "拳头"
+        ],
+        "uid": "uqc7milu4u"
+      },
+      {
+        "id": "起风了",
+        "professions": [
+          "无名"
+        ],
+        "uid": "utdpkha7st"
+      },
+      {
+        "id": "安平君祝",
+        "professions": [
+          "纯奶"
+        ],
+        "uid": "uwkl0xxkdz"
+      },
+      {
+        "id": "燕校长",
+        "professions": [
+          "无名剑法：鸣金·虹",
+          "无名枪法：鸣金·虹"
+        ],
+        "notes": "",
+        "uid": "u4ac90l0qt"
+      },
+      {
+        "id": "不次宵夜",
+        "professions": [
+          "嗟夫刀法：裂石·威",
+          "八方风雷枪：裂石·威"
+        ],
+        "notes": "",
+        "uid": "uv5xs9ocjd"
+      },
+      {
+        "id": "一坨迷糊",
+        "professions": [
+          "嗟夫刀法：裂石·威",
+          "八方风雷枪：裂石·威"
+        ],
+        "notes": "",
+        "uid": "uikkrcf3p0"
+      },
+      {
+        "id": "独孤少擎",
+        "professions": [
+          "无名剑法：鸣金·虹",
+          "无名枪法：鸣金·虹"
+        ],
+        "notes": "",
+        "uid": "uc8joxks3a"
+      }
+    ]
   }
 }
