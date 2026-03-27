@@ -68,15 +68,47 @@ async function pullData() {
 
 // 防抖函数 - 避免频繁提交
 let commitTimer = null;
-function debouncedCommit(message, delay = 5000) {
+let pendingMessage = null;
+
+function debouncedCommit(message, delay = 1000) {
+    pendingMessage = message;
     if (commitTimer) {
         clearTimeout(commitTimer);
     }
 
     commitTimer = setTimeout(() => {
+        pendingMessage = null;
         commitData(message);
     }, delay);
 }
+
+// 进程退出前立即执行挂起的提交，防止重新部署时数据丢失
+function flushPendingCommit() {
+    if (commitTimer && pendingMessage) {
+        clearTimeout(commitTimer);
+        commitTimer = null;
+        console.log('进程退出，立即提交挂起的数据...');
+        // 同步方式提交，确保在进程退出前完成
+        try {
+            ensureGitConfig();
+            const status = execSync('git status --porcelain data/', { encoding: 'utf8' });
+            if (status.trim()) {
+                execSync('git add data/players.json data/teams.json data/lotteries.json');
+                const timestamp = new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' });
+                execSync(`git commit -m "${pendingMessage} - ${timestamp}"`);
+                try { execSync('git pull --rebase origin main', { timeout: 10000 }); } catch (e) {}
+                execSync('git push origin main', { timeout: 15000 });
+                console.log('✓ 退出前数据已保存到 GitHub');
+            }
+        } catch (e) {
+            console.error('退出前提交失败:', e.message);
+        }
+        pendingMessage = null;
+    }
+}
+
+process.on('SIGTERM', () => { flushPendingCommit(); process.exit(0); });
+process.on('SIGINT', () => { flushPendingCommit(); process.exit(0); });
 
 module.exports = {
     commitData,
