@@ -238,72 +238,168 @@ function strongFuzzyMatch(rawText, playersList) {
     return Array.from(matched);
 }
 
-// OCR图片识别API - 导入报名玩家（使用Claude Vision，高准确率）
+// Tesseract OCR 文字清理（去除汉字间多余空格 + 繁→简）
+function cleanTessText(t) {
+    const t2s = {'獨':'独','孤':'孤','擎':'擎','燕':'燕','長':'长','費':'费','曼':'曼','塗':'涂','墓':'慕','苔':'辞','師':'师','兄':'兄','風':'风','說':'说','條':'条','埋':'震','霸':'霸','彷':'仿','蔗':'蔗','滿':'潇','夜':'夜','地':'坨','糊':'糊','石':'石','君':'君','祝':'祝','攻':'攻','束':'慕','矢':'辞','此':'此','吵':'吵','滨':'擎','辣':'辣','點':'点','讓':'让','聞':'闻','端':'端','避':'避','滲':'渗','圖':'图','責':'责','訪':'访','會':'会','家':'家','舍':'舍','格':'格','僅':'仅'};
+    let s = t;
+    for (const [tra, sim] of Object.entries(t2s)) s = s.replace(new RegExp(tra, 'g'), sim);
+    let prev = '';
+    while (prev !== s) {
+        prev = s;
+        s = s.replace(/([\u4e00-\u9fff])\s+([\u4e00-\u9fff])/g, '$1$2');
+    }
+    return s;
+}
+
+// Tesseract 双引擎识别，返回原始文本
+async function ocrWithTesseract(imageBuffer) {
+    const tessDataDir = path.resolve(__dirname);
+    process.env.TESSDATA_PREFIX = tessDataDir;
+    const tessBuffer = await sharp(imageBuffer)
+        .resize({ width: 2400, withoutEnlargement: false })
+        .grayscale()
+        .normalise()
+        .sharpen({ sigma: 2 })
+        .png()
+        .toBuffer();
+    console.log('开始Tesseract OCR（chi_sim+chi_tra）...');
+    const [simResult, traResult] = await Promise.allSettled([
+        Tesseract.recognize(tessBuffer, 'chi_sim', { logger: () => {}, langPath: tessDataDir }),
+        Tesseract.recognize(tessBuffer, 'chi_tra', { logger: () => {}, langPath: tessDataDir })
+    ]);
+    const simText = simResult.status === 'fulfilled' ? simResult.value.data.text : '';
+    const traText = traResult.status === 'fulfilled' ? traResult.value.data.text : '';
+    console.log('Tesseract chi_sim:', simText);
+    console.log('Tesseract chi_tra:', traText);
+    return cleanTessText(simText) + '\n' + cleanTessText(traText);
+}
+
+// GLM-OCR 识别，返回原始文本（使用 /layout_parsing 接口）
+async function ocrWithGlmOcr(imageBuffer) {
+    const apiKey = process.env.ZHIPU_API_KEY;
+    if (!apiKey) throw new Error('未配置 ZHIPU_API_KEY，无法使用 GLM-OCR');
+
+    // 压缩为 JPEG（降低体积，加快传输）
+    const jpegBuffer = await sharp(imageBuffer)
+        .resize(1200, null, { withoutEnlargement: true, fit: 'inside' })
+        .jpeg({ quality: 85 })
+        .toBuffer();
+    // layout_parsing 接口要求 base64 带 MIME 前缀
+    const base64Image = 'data:image/jpeg;base64,' + jpegBuffer.toString('base64');
+
+    console.log('开始 GLM-OCR 识别（/layout_parsing）...');
+    const response = await axios.post(
+        'https://open.bigmodel.cn/api/paas/v4/layout_parsing',
+        { model: 'glm-ocr', file: base64Image },
+        {
+            headers: {
+                'Authorization': `Bearer ${apiKey}`,
+                'Content-Type': 'application/json'
+            },
+            timeout: 60000
+        }
+    );
+
+    // 从 layout_details 和 md_results 两路提取文字，取并集
+    const texts = [];
+    const data = response.data;
+    if (data.layout_details) {
+        for (const page of data.layout_details) {
+            for (const item of page) {
+                if (item.content) texts.push(item.content);
+            }
+        }
+    }
+    if (data.md_results) texts.push(data.md_results);
+    const glmText = texts.join('\n');
+
+    console.log('GLM-OCR 结果:', glmText);
+    return glmText;
+}
+
+// OCR图片识别API - 导入报名玩家
+// 通过环境变量 OCR_ENGINE 选择引擎：'glm'（默认，需ZHIPU_API_KEY）或 'tesseract'
 app.post('/api/ocr-registration', upload.single('image'), async (req, res) => {
     try {
         if (!req.file) {
             return res.json({ success: false, error: '未提供图片文件' });
         }
 
-        // 获取人才库玩家列表
         const playersList = req.body.playersList ? JSON.parse(req.body.playersList) : [];
+        const hasGlmKey = !!process.env.ZHIPU_API_KEY;
+        const engine = process.env.OCR_ENGINE || (hasGlmKey ? 'glm' : 'tesseract');
 
-        // 设置Tesseract语言包路径（traineddata在项目根目录）
-        const tessDataDir = path.resolve(__dirname);
-        process.env.TESSDATA_PREFIX = tessDataDir;
-
-        // 双引擎OCR并行：chi_sim + chi_tra，高清预处理
-        const tessBuffer = await sharp(req.file.buffer)
-            .resize({ width: 2400, withoutEnlargement: false })
-            .grayscale()
-            .normalise()
-            .sharpen({ sigma: 2 })
-            .png()
-            .toBuffer();
-
-        console.log('开始Tesseract OCR（chi_sim+chi_tra）...');
-        const [simResult, traResult] = await Promise.allSettled([
-            Tesseract.recognize(tessBuffer, 'chi_sim', { logger: () => {}, langPath: tessDataDir }),
-            Tesseract.recognize(tessBuffer, 'chi_tra', { logger: () => {}, langPath: tessDataDir })
-        ]);
-
-        const simText = simResult.status === 'fulfilled' ? simResult.value.data.text : '';
-        const traText = traResult.status === 'fulfilled' ? traResult.value.data.text : '';
-        console.log('chi_sim结果:', simText);
-        console.log('chi_tra结果:', traText);
-
-        // 合并两路文字（去除Tesseract在汉字间加的多余空格 + 繁→简转换）
-        function cleanTessText(t) {
-            // 高频繁体→简体映射（针对玩家ID常见字）
-            const t2s = {'獨':'独','孤':'孤','擎':'擎','燕':'燕','長':'长','費':'费','曼':'曼','塗':'涂','墓':'慕','苔':'辞','師':'师','兄':'兄','風':'风','說':'说','條':'条','埋':'震','霸':'霸','彷':'仿','蔗':'蔗','滿':'潇','夜':'夜','地':'坨','糊':'糊','石':'石','君':'君','祝':'祝','攻':'攻','束':'慕','矢':'辞','此':'此','吵':'吵','滨':'擎','攻':'长','辣':'辣','點':'点','讓':'让','寺':'寺','聞':'闻','信':'信','端':'端','避':'避','友':'友','臣':'臣','滲':'渗','圖':'图','責':'责','曝':'曝','哺':'哺','訪':'访','半':'半','衣':'衣','例':'例','會':'会','家':'家','舍':'舍','伍':'伍','格':'格','僅':'仅','攻':'攻'};
-            let s = t;
-            for (const [tra, sim] of Object.entries(t2s)) s = s.replace(new RegExp(tra, 'g'), sim);
-            // 循环去除汉字间空格（直到不再变化）
-            let prev = '';
-            while (prev !== s) {
-                prev = s;
-                s = s.replace(/([\u4e00-\u9fff])\s+([\u4e00-\u9fff])/g, '$1$2');
-            }
-            return s;
-        }
-        const rawText = cleanTessText(simText) + '\n' + cleanTessText(traText);
-
-        // 第二步：服务端多级强力模糊匹配
-        let playerIds = [];
-        if (playersList.length > 0) {
-            playerIds = strongFuzzyMatch(rawText, playersList);
+        let rawText;
+        let engineUsed;
+        if (engine === 'glm') {
+            rawText = await ocrWithGlmOcr(req.file.buffer);
+            engineUsed = 'GLM-OCR';
         } else {
-            playerIds = claudeText.split(/[\n\r]+/).map(l => l.trim()).filter(l => l.length >= 2);
+            rawText = await ocrWithTesseract(req.file.buffer);
+            engineUsed = 'Tesseract';
         }
 
-        console.log('Step2 匹配结果:', playerIds);
-        res.json({ success: true, playerIds });
+        const playerIds = playersList.length > 0
+            ? strongFuzzyMatch(rawText, playersList)
+            : rawText.split(/[\n\r]+/).map(l => l.trim()).filter(l => l.length >= 2);
+
+        console.log(`[${engineUsed}] 匹配结果:`, playerIds);
+        res.json({ success: true, playerIds, engine: engineUsed });
     } catch (error) {
         console.error('OCR识别错误:', error.message);
+        res.json({ success: false, error: error.message || '识别失败，请重试' });
+    }
+});
+
+// OCR对比测试API - 同时跑 GLM-OCR 和 Tesseract，返回两路结果供对比
+app.post('/api/ocr-compare', upload.single('image'), async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.json({ success: false, error: '未提供图片文件' });
+        }
+
+        const playersList = req.body.playersList ? JSON.parse(req.body.playersList) : [];
+
+        const [glmResult, tessResult] = await Promise.allSettled([
+            ocrWithGlmOcr(req.file.buffer),
+            ocrWithTesseract(req.file.buffer)
+        ]);
+
+        const glmText = glmResult.status === 'fulfilled' ? glmResult.value : null;
+        const tessText = tessResult.status === 'fulfilled' ? tessResult.value : null;
+
+        const glmPlayers = glmText ? (playersList.length > 0 ? strongFuzzyMatch(glmText, playersList) : []) : [];
+        const tessPlayers = tessText ? (playersList.length > 0 ? strongFuzzyMatch(tessText, playersList) : []) : [];
+
+        // 统计对比数据
+        const onlyGlm = glmPlayers.filter(p => !tessPlayers.includes(p));
+        const onlyTess = tessPlayers.filter(p => !glmPlayers.includes(p));
+        const both = glmPlayers.filter(p => tessPlayers.includes(p));
+
         res.json({
-            success: false,
-            error: error.message || '识别失败，请重试'
+            success: true,
+            glm: {
+                playerIds: glmPlayers,
+                count: glmPlayers.length,
+                rawText: glmText,
+                error: glmResult.status === 'rejected' ? glmResult.reason.message : null
+            },
+            tesseract: {
+                playerIds: tessPlayers,
+                count: tessPlayers.length,
+                rawText: tessText,
+                error: tessResult.status === 'rejected' ? tessResult.reason.message : null
+            },
+            comparison: {
+                bothRecognized: both,
+                onlyGlm,
+                onlyTesseract: onlyTess,
+                glmAdvantage: onlyGlm.length - onlyTess.length
+            }
         });
+    } catch (error) {
+        console.error('OCR对比错误:', error.message);
+        res.json({ success: false, error: error.message });
     }
 });
 

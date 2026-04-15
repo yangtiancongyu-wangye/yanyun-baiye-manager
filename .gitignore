@@ -5,3 +5,8 @@ uploads/
 .DS_Store
 cloudflared.pkg
 .claude/
+node_modules/
+dist/
+build/
+.git/
+assets/
