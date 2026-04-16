@@ -182,26 +182,8 @@ function strongFuzzyMatch(rawText, playersList) {
     if (!playersList || playersList.length === 0) return [];
     const matched = new Set();
 
-    // OCR常见错字映射（Tesseract中文识别常见错误）
-    const ocrFixes = {
-        '莫':'慕','逢':'辞','业':'辞','哮':'辞','藤':'慕','噌':'辞',
-        '关':'糊','壹':'坨','潇':'宵','滿':'宵','滨':'擎','攻':'长',
-        '移':'鬼','受':'曼','畦':'哇','称':'仿','蔗':'蔗','华':'蔗',
-        '于':'千','翅':'蟑','沉':'觉','胺':'晏','妇':'郎','困':'斩',
-        '巡':'婉','婷':'婉','奸':'好','妹':'婉','贿':'蟑','垒':'螂',
-        '素':'墨','渊':'渊','縮':'蟑','洲':'渊','示':'未','學':'觉',
-        '檔':'极','紅':'红','豐':'丰','况':'沉','机':'烟',
-        '新':'斩','即':'郎','光':'兆','妥':'晏','天':'灵','蜂':'蟑','星':'螂',
-        '汗':'擎','纹':'校','幕':'慕','噶':'喵','灿':'糊','入':'仿','穗':'穗',
-        '凍':'兆','際':'兆','產':'丰','覺':'觉','斷':'斩','受':'晏'
-    };
-    let fixedText = rawText;
-    for (const [wrong, right] of Object.entries(ocrFixes)) {
-        fixedText = fixedText.replace(new RegExp(wrong, 'g'), right);
-    }
-
     // 把原始文本按各种分隔符切分为候选片段
-    const lines = fixedText.split(/[\n\r]+/);
+    const lines = rawText.split(/[\n\r]+/);
     const candidates = new Set();
     for (const line of lines) {
         const segs = line.split(/[\s,，、|｜/\\:：\t]+/);
@@ -216,23 +198,31 @@ function strongFuzzyMatch(rawText, playersList) {
     // 对每个玩家名，在候选中做多级匹配
     for (const name of playersList) {
         if (!name || name.length === 0) continue;
-        // 1. 原文直接包含玩家名（最强，精确）
-        if (fixedText.includes(name)) { matched.add(name); continue; }
-        // 2. 候选片段直接包含玩家名（候选比玩家名长，包含玩家名作为子串）
+
+        // 1. 原文直接包含玩家名（精确）
+        if (rawText.includes(name)) { matched.add(name); continue; }
+
+        // 2. 候选片段包含玩家名作为子串
         let found = false;
         for (const cand of candidates) {
-            if (cand.includes(name)) {
+            if (cand.includes(name)) { matched.add(name); found = true; break; }
+        }
+        if (found) continue;
+
+        // 3. 玩家名包含候选片段（候选是玩家名的子串，长度 >= 2/3 玩家名长度）
+        for (const cand of candidates) {
+            if (cand.length >= 2 && name.includes(cand) && cand.length >= Math.ceil(name.length * 0.6)) {
                 matched.add(name); found = true; break;
             }
         }
         if (found) continue;
-        // 3. 编辑距离（放宽：3字及以下允许1个差异，4字及以上允许2个差异）
-        const maxDist = name.length <= 3 ? 1 : 2;
+
+        // 4. 编辑距离（动态阈值：长名字容忍更多差异）
+        //    GLM-OCR 对复杂汉字可能多/少 1-2 字，放宽阈值
+        const maxDist = name.length <= 2 ? 1 : name.length <= 4 ? 2 : 3;
         for (const cand of candidates) {
-            if (Math.abs(cand.length - name.length) > 2) continue;
-            if (levenshtein(cand, name) <= maxDist) {
-                matched.add(name); break;
-            }
+            if (Math.abs(cand.length - name.length) > maxDist) continue;
+            if (levenshtein(cand, name) <= maxDist) { matched.add(name); break; }
         }
     }
     return Array.from(matched);
@@ -300,20 +290,33 @@ async function ocrWithGlmOcr(imageBuffer) {
         }
     );
 
-    // 从 layout_details 和 md_results 两路提取文字，取并集
-    const texts = [];
+    // 字段名为驼峰：layoutDetails / mdResults
+    // content 中可能含 HTML 标签（如 <div align="center">），需剥离
+    const stripHtml = (s) => s ? s.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim() : '';
+
     const data = response.data;
-    if (data.layout_details) {
-        for (const page of data.layout_details) {
-            for (const item of page) {
-                if (item.content) texts.push(item.content);
-            }
+    const texts = [];
+
+    // 从 layoutDetails 提取所有文字块的纯文本
+    const details = data.layoutDetails || data.layout_details || [];
+    for (const page of details) {
+        for (const item of page) {
+            if (item.content) texts.push(stripHtml(item.content));
         }
     }
-    if (data.md_results) texts.push(data.md_results);
-    const glmText = texts.join('\n');
 
-    console.log('GLM-OCR 结果:', glmText);
+    // 同时附加 mdResults（去掉图片引用和 HTML，保留纯文字）
+    const md = data.mdResults || data.md_results || '';
+    if (md) {
+        const mdClean = md
+            .replace(/!\[.*?\]\(.*?\)/g, ' ')  // 去掉 ![]() 图片引用
+            .replace(/<[^>]+>/g, ' ')            // 去掉 HTML 标签
+            .replace(/\s+/g, '\n').trim();
+        texts.push(mdClean);
+    }
+
+    const glmText = texts.join('\n');
+    console.log('GLM-OCR 提取文字:', glmText);
     return glmText;
 }
 
@@ -339,9 +342,17 @@ app.post('/api/ocr-registration', upload.single('image'), async (req, res) => {
             engineUsed = 'Tesseract';
         }
 
-        const playerIds = playersList.length > 0
-            ? strongFuzzyMatch(rawText, playersList)
-            : rawText.split(/[\n\r]+/).map(l => l.trim()).filter(l => l.length >= 2);
+        // 优先用 AI 语义匹配（有 playersList 时），再兜底模糊匹配
+        let playerIds;
+        if (playersList.length > 0) {
+            playerIds = await aiMatchPlayers(rawText, playersList);
+            if (!playerIds || playerIds.length === 0) {
+                // AI 失败时降级到模糊匹配
+                playerIds = strongFuzzyMatch(rawText, playersList);
+            }
+        } else {
+            playerIds = rawText.split(/[\n\r]+/).map(l => l.trim()).filter(l => l.length >= 2);
+        }
 
         console.log(`[${engineUsed}] 匹配结果:`, playerIds);
         res.json({ success: true, playerIds, engine: engineUsed });
@@ -350,6 +361,45 @@ app.post('/api/ocr-registration', upload.single('image'), async (req, res) => {
         res.json({ success: false, error: error.message || '识别失败，请重试' });
     }
 });
+
+// AI语义匹配：把OCR文字和人才库发给 Claude，让其判断哪些文字是玩家名
+async function aiMatchPlayers(ocrText, playersList) {
+    const prompt = `以下是从报名截图中OCR识别出的文字（可能有识别偏差）：
+
+${ocrText}
+
+以下是人才库中的所有玩家ID（完整名单）：
+${playersList.join('、')}
+
+请判断OCR文字中出现了哪些玩家ID（即哪些玩家报名了）。
+注意：OCR识别可能有错字、多字、少字，请结合相似度判断，如"飞天大翅蟑螂"对应"飞天大蟑螂"。
+
+只返回一个JSON数组，包含实际出现在图片中的玩家ID（必须是人才库中存在的原始ID），格式：
+["玩家ID1", "玩家ID2", ...]
+不要输出任何解释。`;
+
+    const response = await axios.post(
+        'https://cursor.scihub.edu.kg/api/v1/chat/completions',
+        {
+            model: 'claude-sonnet-4-6',
+            max_tokens: 1024,
+            messages: [{ role: 'user', content: prompt }]
+        },
+        {
+            headers: {
+                'Authorization': 'Bearer cr_885a369a5301a04d886ad0af117dd27a90cbbb2b96fedd7ce1bd64aebf38369a',
+                'Content-Type': 'application/json'
+            },
+            timeout: 30000
+        }
+    );
+
+    let aiResp = response.data.choices[0].message.content.trim();
+    aiResp = aiResp.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+    const matched = JSON.parse(aiResp);
+    // 过滤：只保留人才库中确实存在的名字
+    return matched.filter(id => playersList.includes(id));
+}
 
 // OCR对比测试API - 同时跑 GLM-OCR 和 Tesseract，返回两路结果供对比
 app.post('/api/ocr-compare', upload.single('image'), async (req, res) => {
