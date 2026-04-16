@@ -364,7 +364,8 @@ app.post('/api/ocr-registration', upload.single('image'), async (req, res) => {
 
 // AI语义匹配：把OCR文字和人才库发给 Claude，让其判断哪些文字是玩家名
 async function aiMatchPlayers(ocrText, playersList) {
-    const prompt = `以下是从报名截图中OCR识别出的文字（可能有识别偏差）：
+    try {
+        const prompt = `以下是从报名截图中OCR识别出的文字（可能有识别偏差）：
 
 ${ocrText}
 
@@ -378,27 +379,31 @@ ${playersList.join('、')}
 ["玩家ID1", "玩家ID2", ...]
 不要输出任何解释。`;
 
-    const response = await axios.post(
-        'https://cursor.scihub.edu.kg/api/v1/chat/completions',
-        {
-            model: 'claude-sonnet-4-6',
-            max_tokens: 1024,
-            messages: [{ role: 'user', content: prompt }]
-        },
-        {
-            headers: {
-                'Authorization': 'Bearer cr_885a369a5301a04d886ad0af117dd27a90cbbb2b96fedd7ce1bd64aebf38369a',
-                'Content-Type': 'application/json'
+        const response = await axios.post(
+            'https://cursor.scihub.edu.kg/api/v1/chat/completions',
+            {
+                model: 'claude-sonnet-4-6',
+                max_tokens: 1024,
+                messages: [{ role: 'user', content: prompt }]
             },
-            timeout: 30000
-        }
-    );
+            {
+                headers: {
+                    'Authorization': 'Bearer cr_885a369a5301a04d886ad0af117dd27a90cbbb2b96fedd7ce1bd64aebf38369a',
+                    'Content-Type': 'application/json'
+                },
+                timeout: 30000
+            }
+        );
 
-    let aiResp = response.data.choices[0].message.content.trim();
-    aiResp = aiResp.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-    const matched = JSON.parse(aiResp);
-    // 过滤：只保留人才库中确实存在的名字
-    return matched.filter(id => playersList.includes(id));
+        let aiResp = response.data.choices[0].message.content.trim();
+        aiResp = aiResp.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+        const matched = JSON.parse(aiResp);
+        // 过滤：只保留人才库中确实存在的名字
+        return matched.filter(id => playersList.includes(id));
+    } catch (error) {
+        console.error('AI匹配失败:', error.message);
+        return null; // 返回 null 表示失败，触发降级到模糊匹配
+    }
 }
 
 // OCR对比测试API - 同时跑 GLM-OCR 和 Tesseract，返回两路结果供对比
