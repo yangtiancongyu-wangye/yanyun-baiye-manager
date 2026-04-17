@@ -270,9 +270,10 @@ async function ocrWithGlmOcr(imageBuffer) {
     if (!apiKey) throw new Error('未配置 ZHIPU_API_KEY，无法使用 GLM-OCR');
 
     // 压缩为 JPEG（降低体积，加快传输）
+    // Render 海外部署：进一步压缩到 800px，质量 70%，减少传输时间
     const jpegBuffer = await sharp(imageBuffer)
-        .resize(1200, null, { withoutEnlargement: true, fit: 'inside' })
-        .jpeg({ quality: 85 })
+        .resize(800, null, { withoutEnlargement: true, fit: 'inside' })
+        .jpeg({ quality: 70 })
         .toBuffer();
     // layout_parsing 接口要求 base64 带 MIME 前缀
     const base64Image = 'data:image/jpeg;base64,' + jpegBuffer.toString('base64');
@@ -286,7 +287,7 @@ async function ocrWithGlmOcr(imageBuffer) {
                 'Authorization': `Bearer ${apiKey}`,
                 'Content-Type': 'application/json'
             },
-            timeout: 60000
+            timeout: 25000  // 降低到 25 秒，避免 Render 30 秒超时
         }
     );
 
