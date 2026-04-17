@@ -270,15 +270,18 @@ async function ocrWithGlmOcr(imageBuffer) {
     if (!apiKey) throw new Error('未配置 ZHIPU_API_KEY，无法使用 GLM-OCR');
 
     // 压缩为 JPEG（降低体积，加快传输）
-    // Render 海外部署：进一步压缩到 800px，质量 70%，减少传输时间
+    // Render 海外部署：进一步压缩到 600px，质量 60%，最小化传输
     const jpegBuffer = await sharp(imageBuffer)
-        .resize(800, null, { withoutEnlargement: true, fit: 'inside' })
-        .jpeg({ quality: 70 })
+        .resize(600, null, { withoutEnlargement: true, fit: 'inside' })
+        .jpeg({ quality: 60 })
         .toBuffer();
-    // layout_parsing 接口要求 base64 带 MIME 前缀
+
     const base64Image = 'data:image/jpeg;base64,' + jpegBuffer.toString('base64');
+    console.log(`GLM-OCR 图片大小: ${Math.round(base64Image.length/1024)}KB`);
 
     console.log('开始 GLM-OCR 识别（/layout_parsing）...');
+    const startTime = Date.now();
+
     const response = await axios.post(
         'https://open.bigmodel.cn/api/paas/v4/layout_parsing',
         { model: 'glm-ocr', file: base64Image },
@@ -287,9 +290,14 @@ async function ocrWithGlmOcr(imageBuffer) {
                 'Authorization': `Bearer ${apiKey}`,
                 'Content-Type': 'application/json'
             },
-            timeout: 25000  // 降低到 25 秒，避免 Render 30 秒超时
+            timeout: 20000,  // 20 秒超时
+            // 添加 HTTP/2 和 keepalive 优化
+            httpAgent: new (require('http').Agent)({ keepAlive: true }),
+            httpsAgent: new (require('https').Agent)({ keepAlive: true })
         }
     );
+
+    console.log(`GLM-OCR 耗时: ${Date.now() - startTime}ms`);
 
     // 字段名为驼峰：layoutDetails / mdResults
     // content 中可能含 HTML 标签（如 <div align="center">），需剥离
