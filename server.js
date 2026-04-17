@@ -322,6 +322,7 @@ async function ocrWithGlmOcr(imageBuffer) {
 
 // OCR图片识别API - 导入报名玩家
 // 通过环境变量 OCR_ENGINE 选择引擎：'glm'（默认，需ZHIPU_API_KEY）或 'tesseract'
+// Render 部署时自动检测：如果是生产环境且 GLM-OCR 超时，自动降级 Tesseract
 app.post('/api/ocr-registration', upload.single('image'), async (req, res) => {
     try {
         if (!req.file) {
@@ -330,7 +331,9 @@ app.post('/api/ocr-registration', upload.single('image'), async (req, res) => {
 
         const playersList = req.body.playersList ? JSON.parse(req.body.playersList) : [];
         const hasGlmKey = !!process.env.ZHIPU_API_KEY;
-        const engine = process.env.OCR_ENGINE || (hasGlmKey ? 'glm' : 'tesseract');
+        const isRender = !!process.env.RENDER; // Render 环境变量
+        // Render 上强制用 Tesseract（GLM-OCR 从美国访问中国 API 太慢）
+        const engine = isRender ? 'tesseract' : (process.env.OCR_ENGINE || (hasGlmKey ? 'glm' : 'tesseract'));
 
         let rawText;
         let engineUsed;
