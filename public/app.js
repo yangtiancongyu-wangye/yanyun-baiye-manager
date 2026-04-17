@@ -348,6 +348,38 @@ async function handleImportRegistrationFile(e) {
 }
 
 // 处理报名图片
+// 压缩图片为 blob（用于上传，最大 1200px，质量 80%）
+function compressImageToBlob(file) {
+    return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const img = new Image();
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                let width = img.width;
+                let height = img.height;
+                const maxSize = 1200;
+                if (width > maxSize || height > maxSize) {
+                    if (width > height) {
+                        height = Math.round((height / width) * maxSize);
+                        width = maxSize;
+                    } else {
+                        width = Math.round((width / height) * maxSize);
+                        height = maxSize;
+                    }
+                }
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, width, height);
+                canvas.toBlob((blob) => resolve(blob), 'image/jpeg', 0.8);
+            };
+            img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+    });
+}
+
 async function processRegistrationImage(file) {
     showLoading('正在识别报名玩家...');
     closeImportRegistrationModal();
@@ -356,9 +388,10 @@ async function processRegistrationImage(file) {
         // 准备人才库玩家列表
         const playersList = players.map(p => p.id);
 
-        // 使用FormData上传原始文件
+        // 压缩图片后再上传（避免大图超过隧道/网关限制）
+        const compressedBlob = await compressImageToBlob(file);
         const formData = new FormData();
-        formData.append('image', file);
+        formData.append('image', compressedBlob, 'image.jpg');
         formData.append('playersList', JSON.stringify(playersList));
 
         // 调用后端API
