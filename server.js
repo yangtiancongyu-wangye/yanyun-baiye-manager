@@ -134,6 +134,46 @@ app.post('/api/ocr-players', async (req, res) => {
     }
 });
 
+// Claude Vision OCR（降级方案，用于 GLM-OCR 失败时）
+async function ocrWithClaudeVision(imageBuffer, playersList) {
+    const base64Image = 'data:image/jpeg;base64,' + imageBuffer.toString('base64');
+
+    const prompt = `识别这张报名截图中的玩家ID。
+
+人才库玩家名单：
+${playersList.join('、')}
+
+请从图片中识别出哪些玩家报名了。只返回JSON数组，格式：
+["玩家ID1", "玩家ID2", ...]`;
+
+    const response = await axios.post(
+        'https://cursor.scihub.edu.kg/api/v1/chat/completions',
+        {
+            model: 'claude-sonnet-4-6',
+            max_tokens: 1024,
+            messages: [{
+                role: 'user',
+                content: [
+                    { type: 'image_url', image_url: { url: base64Image } },
+                    { type: 'text', text: prompt }
+                ]
+            }]
+        },
+        {
+            headers: {
+                'Authorization': 'Bearer cr_885a369a5301a04d886ad0af117dd27a90cbbb2b96fedd7ce1bd64aebf38369a',
+                'Content-Type': 'application/json'
+            },
+            timeout: 30000
+        }
+    );
+
+    let aiResp = response.data.choices[0].message.content.trim();
+    aiResp = aiResp.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+    const matched = JSON.parse(aiResp);
+    return matched.filter(id => playersList.includes(id));
+}
+
 // 编辑距离（Levenshtein）用于模糊匹配
 function levenshtein(a, b) {
     const m = a.length, n = b.length;
@@ -340,15 +380,23 @@ app.post('/api/ocr-registration', upload.single('image'), async (req, res) => {
 
         const playersList = req.body.playersList ? JSON.parse(req.body.playersList) : [];
         const hasGlmKey = !!process.env.ZHIPU_API_KEY;
-        const isRender = !!process.env.RENDER; // Render 环境变量
-        // Render 上强制用 Tesseract（GLM-OCR 从美国访问中国 API 太慢）
-        const engine = isRender ? 'tesseract' : (process.env.OCR_ENGINE || (hasGlmKey ? 'glm' : 'tesseract'));
+        const engine = process.env.OCR_ENGINE || (hasGlmKey ? 'glm' : 'tesseract');
 
         let rawText;
         let engineUsed;
+
+        // 优先 GLM-OCR，失败时降级到 Claude Vision
         if (engine === 'glm') {
-            rawText = await ocrWithGlmOcr(req.file.buffer);
-            engineUsed = 'GLM-OCR';
+            try {
+                rawText = await ocrWithGlmOcr(req.file.buffer);
+                engineUsed = 'GLM-OCR';
+            } catch (glmError) {
+                console.warn('GLM-OCR 失败，降级到 Claude Vision:', glmError.message);
+                // 降级：用 Claude Vision 直接识别
+                const playerIds = await ocrWithClaudeVision(req.file.buffer, playersList);
+                console.log('[Claude-Vision] 匹配结果:', playerIds);
+                return res.json({ success: true, playerIds, engine: 'Claude-Vision' });
+            }
         } else {
             rawText = await ocrWithTesseract(req.file.buffer);
             engineUsed = 'Tesseract';
