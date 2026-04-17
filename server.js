@@ -362,7 +362,11 @@ app.post('/api/ocr-registration', upload.single('image'), async (req, res) => {
         res.json({ success: true, playerIds, engine: engineUsed });
     } catch (error) {
         console.error('OCR识别错误:', error.message);
-        res.json({ success: false, error: error.message || '识别失败，请重试' });
+        console.error('错误堆栈:', error.stack);
+        // 确保返回有效 JSON，避免前端收到空响应
+        if (!res.headersSent) {
+            res.status(200).json({ success: false, error: error.message || '识别失败，请重试' });
+        }
     }
 });
 
