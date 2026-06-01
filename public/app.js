@@ -2146,7 +2146,7 @@ function showLotteryAnimation(allPlayers, winners, prizes, onComplete) {
         font-family: 'Microsoft YaHei', 'Segoe UI', sans-serif;
         text-transform: uppercase;
     `;
-    title.textContent = '百业抽奖仪式';
+    title.textContent = '加州大乐透';
     animBox.appendChild(title);
 
     // 副标题（日期）

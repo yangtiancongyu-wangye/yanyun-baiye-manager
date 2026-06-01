@@ -888,6 +888,42 @@ function normalizeLotteryPayload(lotteries) {
     });
 }
 
+function mergeLotteryHistory(existingLotteries, incomingLotteries) {
+    const existingById = new Map();
+    for (const lottery of Array.isArray(existingLotteries) ? existingLotteries : []) {
+        existingById.set(lottery.id, lottery);
+    }
+
+    const merged = [];
+    const seen = new Set();
+
+    for (const existing of Array.isArray(existingLotteries) ? existingLotteries : []) {
+        const incoming = Array.isArray(incomingLotteries)
+            ? incomingLotteries.find(lottery => lottery.id === existing.id)
+            : null;
+
+        if (incoming) {
+            merged.push({
+                ...existing,
+                ...incoming,
+                id: existing.id,
+                createTime: existing.createTime || incoming.createTime,
+                winners: incoming.winners ?? existing.winners
+            });
+            seen.add(existing.id);
+        } else {
+            merged.push(existing);
+        }
+    }
+
+    for (const incoming of Array.isArray(incomingLotteries) ? incomingLotteries : []) {
+        if (seen.has(incoming.id) || existingById.has(incoming.id)) continue;
+        merged.push(incoming);
+    }
+
+    return merged;
+}
+
 // 启动时从 GitHub 拉取最新数据
 (async () => {
     await pullData();
@@ -990,7 +1026,11 @@ app.get('/api/lotteries', (req, res) => {
 // 保存抽奖数据
 app.post('/api/lotteries', (req, res) => {
     try {
-        const lotteries = normalizeLotteryPayload(req.body);
+        const existingLotteries = fs.existsSync(LOTTERIES_FILE)
+            ? JSON.parse(fs.readFileSync(LOTTERIES_FILE, 'utf8'))
+            : [];
+        const incomingLotteries = normalizeLotteryPayload(req.body);
+        const lotteries = mergeLotteryHistory(existingLotteries, incomingLotteries);
         fs.writeFileSync(LOTTERIES_FILE, JSON.stringify(lotteries, null, 2));
 
         // 自动提交到 GitHub（5秒防抖）
