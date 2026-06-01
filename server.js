@@ -47,6 +47,82 @@ async function compressImage(buffer) {
     }
 }
 
+function imageBase64ToBuffer(imageBase64) {
+    const base64 = imageBase64.replace(/^data:image\/\w+;base64,/, '');
+    return Buffer.from(base64, 'base64');
+}
+
+async function buildTalentOcrImages(imageBase64) {
+    const originalBuffer = imageBase64ToBuffer(imageBase64);
+    const original = await sharp(originalBuffer)
+        .resize(1800, null, { withoutEnlargement: true, fit: 'inside' })
+        .jpeg({ quality: 88 })
+        .toBuffer();
+    const enhanced = await sharp(originalBuffer)
+        .resize(2400, null, { withoutEnlargement: false, fit: 'inside' })
+        .grayscale()
+        .normalise()
+        .modulate({ brightness: 1.08 })
+        .linear(1.18, -18)
+        .sharpen({ sigma: 1.4, m1: 1.2, m2: 2.2 })
+        .jpeg({ quality: 92 })
+        .toBuffer();
+
+    return [
+        'data:image/jpeg;base64,' + original.toString('base64'),
+        'data:image/jpeg;base64,' + enhanced.toString('base64')
+    ];
+}
+
+function extractJsonArray(text) {
+    const cleaned = String(text || '').replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+    const start = cleaned.indexOf('[');
+    const end = cleaned.lastIndexOf(']');
+    if (start === -1 || end === -1 || end <= start) {
+        throw new Error('AI返回内容中没有找到JSON数组');
+    }
+    return JSON.parse(cleaned.slice(start, end + 1));
+}
+
+const PROFESSION_ALIASES = [
+    { canonical: '裂石·威', names: ['裂石·威', '嗟夫刀法', '八方风雷枪', '威'] },
+    { canonical: '牵丝·霖', names: ['牵丝·霖', '明川药典', '千香引魂蛊', '霖'] },
+    { canonical: '鸣金·虹', names: ['鸣金·虹', '无名剑法', '无名枪法', '虹'] },
+    { canonical: '鸣金·影', names: ['鸣金·影', '积矩九剑', '九曲惊神枪', '影'] },
+    { canonical: '牵丝·玉', names: ['牵丝·玉', '青山执笔', '九重春色', '玉'] },
+    { canonical: '破竹·风', names: ['破竹·风', '泥犁三垢', '粟子游尘', '风'] },
+    { canonical: '破竹·尘', names: ['破竹·尘', '醉梦游春', '粟子行云', '尘'] },
+    { canonical: '裂石·钧', names: ['裂石·钧', '斩雪刀法', '十方破阵', '钧'] },
+    { canonical: '破竹·鸢', names: ['破竹·鸢', '天志垂象', '千机索天', '鸢'] }
+];
+
+function normalizeTalentPlayers(rawPlayers) {
+    const seen = new Set();
+    const normalized = [];
+
+    for (const rawPlayer of Array.isArray(rawPlayers) ? rawPlayers : []) {
+        const id = String(rawPlayer.id || '').trim();
+        if (!id || seen.has(id)) continue;
+
+        const rawProfessions = Array.isArray(rawPlayer.professions) ? rawPlayer.professions : [];
+        const professions = [];
+        for (const profession of rawProfessions) {
+            const text = String(profession || '').trim();
+            const match = PROFESSION_ALIASES.find(item => item.names.some(name => text.includes(name)));
+            const canonical = match ? match.canonical : text;
+            if (canonical && !professions.includes(canonical)) professions.push(canonical);
+        }
+
+        normalized.push({
+            id,
+            professions: professions.slice(0, 2)
+        });
+        seen.add(id);
+    }
+
+    return normalized;
+}
+
 // OCR图片识别API - 导入玩家
 app.post('/api/ocr-players', async (req, res) => {
     try {
@@ -56,28 +132,31 @@ app.post('/api/ocr-players', async (req, res) => {
             return res.json({ success: false, error: '未提供图片数据' });
         }
 
-        const prompt = `你是一个OCR识别助手。请识别这张图片中的玩家信息。图片中包含玩家ID和职业信息。
+        const ocrImages = await buildTalentOcrImages(imageBase64);
 
-职业列表参考（请严格匹配）：
-- 嗟夫刀法、八方风雷枪（裂石·威）
-- 明川药典、千香引魂蛊（牵丝·霖）
-- 无名剑法、无名枪法（鸣金·虹）
-- 积矩九剑、九曲惊神枪（鸣金·影）
-- 青山执笔、九重春色（牵丝·玉）
-- 泥犁三垢、粟子游尘（破竹·风）
-- 醉梦游春、粟子行云（破竹·尘）
-- 斩雪刀法、十方破阵（裂石·钧）
-- 天志垂象、千机索天（破竹·鸢）
+        const prompt = `你是一个高精度游戏名单OCR助手。下面有同一张截图的原图和增强图，请综合两张图识别玩家信息。图片中通常是表格或列表，每行包含玩家ID和职业/流派信息。
+
+职业/流派映射（返回括号内短名即可）：
+- 嗟夫刀法、八方风雷枪 -> 裂石·威
+- 明川药典、千香引魂蛊 -> 牵丝·霖
+- 无名剑法、无名枪法 -> 鸣金·虹
+- 积矩九剑、九曲惊神枪 -> 鸣金·影
+- 青山执笔、九重春色 -> 牵丝·玉
+- 泥犁三垢、粟子游尘 -> 破竹·风
+- 醉梦游春、粟子行云 -> 破竹·尘
+- 斩雪刀法、十方破阵 -> 裂石·钧
+- 天志垂象、千机索天 -> 破竹·鸢
 
 识别要求：
-1. 每个玩家通常有1-2个职业
-2. 职业名称可能不完整，请根据上面的列表匹配最接近的完整职业名
-3. 仔细识别每一行，不要遗漏任何玩家
-4. 如果看到简称，请匹配完整名称（如"霖"对应"牵丝·霖"，"虹"对应"鸣金·虹"）
+1. 逐行扫描，不要因为文字小、浅色、遮挡或换行而漏掉玩家。
+2. 玩家ID必须按图片原文返回，不要翻译、补全、改写或凭空新增。
+3. 每个玩家通常有1-2个职业；如果只看到流派简称，如“霖”“虹”“影”，请按上方映射返回短名。
+4. 职业无法确定时，professions 可以为空数组；不要把战力、序号、日期、按钮文字当成玩家ID。
+5. 如果同一玩家在原图和增强图都出现，只返回一次。
 
 请提取每一行的玩家ID和职业信息，返回JSON数组格式：
 [
-  {"id": "玩家ID", "professions": ["职业1", "职业2"]},
+  {"id": "玩家ID", "professions": ["裂石·威", "牵丝·霖"]},
   ...
 ]
 
@@ -91,7 +170,8 @@ app.post('/api/ocr-players', async (req, res) => {
                 messages: [{
                     role: 'user',
                     content: [
-                        { type: 'image_url', image_url: { url: imageBase64 } },
+                        { type: 'image_url', image_url: { url: ocrImages[0] } },
+                        { type: 'image_url', image_url: { url: ocrImages[1] } },
                         { type: 'text', text: prompt }
                     ]
                 }]
@@ -107,15 +187,12 @@ app.post('/api/ocr-players', async (req, res) => {
         let aiResponse = response.data.choices[0].message.content;
         console.log('AI原始响应:', aiResponse);
 
-        // 清理响应文本
-        aiResponse = aiResponse.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-
         // 检查是否是错误消息
         if (aiResponse.startsWith("I can't") || aiResponse.startsWith("I cannot")) {
             throw new Error('AI拒绝处理请求: ' + aiResponse);
         }
 
-        const players = JSON.parse(aiResponse);
+        const players = normalizeTalentPlayers(extractJsonArray(aiResponse));
 
         res.json({ success: true, players });
     } catch (error) {
@@ -751,6 +828,66 @@ const PLAYERS_FILE = path.join(DATA_DIR, 'players.json');
 const TEAMS_FILE = path.join(DATA_DIR, 'teams.json');
 const LOTTERIES_FILE = path.join(DATA_DIR, 'lotteries.json');
 
+function isLotteryDrawn(lottery) {
+    return Array.isArray(lottery.winners) && lottery.winners.length > 0;
+}
+
+function normalizePendingLottery(lottery, playerIds) {
+    const excludedIds = Array.isArray(lottery.excludedPlayerIds)
+        ? lottery.excludedPlayerIds.filter(id => playerIds.includes(id))
+        : [];
+    const excludedSet = new Set(excludedIds);
+
+    return {
+        ...lottery,
+        playerIds: playerIds.filter(id => !excludedSet.has(id)),
+        excludedPlayerIds: excludedIds
+    };
+}
+
+function syncPendingLotteriesWithPlayers(players) {
+    if (!fs.existsSync(LOTTERIES_FILE)) return false;
+
+    const playerIds = players.map(player => player.id);
+    const lotteries = JSON.parse(fs.readFileSync(LOTTERIES_FILE, 'utf8'));
+    let changed = false;
+
+    for (const lottery of lotteries) {
+        if (isLotteryDrawn(lottery)) continue;
+
+        const currentIds = Array.isArray(lottery.playerIds) ? lottery.playerIds : [];
+        const currentExcludedIds = Array.isArray(lottery.excludedPlayerIds) ? lottery.excludedPlayerIds : [];
+        const normalized = normalizePendingLottery(lottery, playerIds);
+        const samePool = currentIds.length === normalized.playerIds.length &&
+            currentIds.every((id, index) => id === normalized.playerIds[index]);
+        const sameExcluded = currentExcludedIds.length === normalized.excludedPlayerIds.length &&
+            currentExcludedIds.every((id, index) => id === normalized.excludedPlayerIds[index]);
+
+        if (!samePool || !sameExcluded) {
+            lottery.playerIds = normalized.playerIds;
+            lottery.excludedPlayerIds = normalized.excludedPlayerIds;
+            changed = true;
+        }
+    }
+
+    if (changed) {
+        fs.writeFileSync(LOTTERIES_FILE, JSON.stringify(lotteries, null, 2));
+    }
+
+    return changed;
+}
+
+function normalizeLotteryPayload(lotteries) {
+    const players = JSON.parse(fs.readFileSync(PLAYERS_FILE, 'utf8'));
+    const playerIds = players.map(player => player.id);
+
+    return lotteries.map(lottery => {
+        if (isLotteryDrawn(lottery)) return lottery;
+
+        return normalizePendingLottery(lottery, playerIds);
+    });
+}
+
 // 启动时从 GitHub 拉取最新数据
 (async () => {
     await pullData();
@@ -800,6 +937,7 @@ app.post('/api/players', (req, res) => {
             if (!p.uid) p.uid = generateUid();
         }
         fs.writeFileSync(PLAYERS_FILE, JSON.stringify(players, null, 2));
+        syncPendingLotteriesWithPlayers(players);
 
         // 自动提交到 GitHub（5秒防抖）
         debouncedCommit('更新玩家数据');
@@ -852,7 +990,7 @@ app.get('/api/lotteries', (req, res) => {
 // 保存抽奖数据
 app.post('/api/lotteries', (req, res) => {
     try {
-        const lotteries = req.body;
+        const lotteries = normalizeLotteryPayload(req.body);
         fs.writeFileSync(LOTTERIES_FILE, JSON.stringify(lotteries, null, 2));
 
         // 自动提交到 GitHub（5秒防抖）

@@ -33,19 +33,6 @@ async function loadDataFromServer() {
     }
 }
 
-// 保存玩家数据到服务器
-async function savePlayers() {
-    try {
-        await fetch('/api/players', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(players)
-        });
-    } catch (error) {
-        console.error('保存玩家数据失败:', error);
-    }
-}
-
 // 保存配队数据到服务器
 async function saveTeams() {
     try {
@@ -62,6 +49,7 @@ async function saveTeams() {
 // 初始化
 document.addEventListener('DOMContentLoaded', async () => {
     await loadDataFromServer();
+    syncLotteryPlayersWithTalent();
     renderTalentTable();
     updateBatchSelect();
     renderLotteryTable();
@@ -151,7 +139,7 @@ function closePlayerModal() {
     playerForm.reset();
 }
 
-function handlePlayerSubmit(e) {
+async function handlePlayerSubmit(e) {
     e.preventDefault();
 
     const id = document.getElementById('player-id').value.trim();
@@ -165,6 +153,7 @@ function handlePlayerSubmit(e) {
     }
 
     const player = { id, professions: [profession], notes };
+    let lotteriesChanged = false;
 
     if (playerForm.dataset.editIndex !== undefined) {
         // 编辑时保留原有uid
@@ -176,15 +165,21 @@ function handlePlayerSubmit(e) {
         syncPlayerToTeams(oldId, player);
         // 同步到报名数据（id变更时）
         if (oldId !== player.id) {
-            syncPlayerIdToLotteries(oldId, player.id);
+            syncPlayerIdToLotteries(oldId, player.id, false);
+            lotteriesChanged = true;
         }
     } else {
         // 新增时生成uid（服务端会兜底，前端也生成以确保本地一致性）
         player.uid = 'u' + Math.random().toString(36).substring(2, 11);
         players.push(player);
+        lotteriesChanged = syncLotteryPlayersWithTalent(false);
     }
 
-    savePlayers();
+    const playersSaved = await savePlayers();
+    if (playersSaved && lotteriesChanged) {
+        await saveLotteries();
+        renderLotteryTable();
+    }
     renderTalentTable();
     closePlayerModal();
 }
@@ -218,34 +213,131 @@ function syncPlayerToTeams(oldId, newPlayer) {
 }
 
 // 同步玩家ID变更到报名数据
-function syncPlayerIdToLotteries(oldId, newId) {
+function syncPlayerIdToLotteries(oldId, newId, saveAfterSync = true) {
     let changed = false;
     lotteries.forEach(lottery => {
         if (lottery.playerIds) {
-            const idx = lottery.playerIds.indexOf(oldId);
-            if (idx !== -1) {
-                lottery.playerIds[idx] = newId;
-                changed = true;
-            }
+            lottery.playerIds = lottery.playerIds.map(id => {
+                if (id === oldId) {
+                    changed = true;
+                    return newId;
+                }
+                return id;
+            });
+        }
+        if (lottery.winners) {
+            lottery.winners = lottery.winners.map(id => {
+                if (id === oldId) {
+                    changed = true;
+                    return newId;
+                }
+                return id;
+            });
+        }
+        if (lottery.excludedPlayerIds) {
+            lottery.excludedPlayerIds = lottery.excludedPlayerIds.map(id => {
+                if (id === oldId) {
+                    changed = true;
+                    return newId;
+                }
+                return id;
+            });
         }
     });
-    if (changed) saveLotteries();
+    const poolChanged = syncLotteryPlayersWithTalent(false);
+    if ((changed || poolChanged) && saveAfterSync) {
+        saveLotteries();
+        renderLotteryTable();
+    }
+    return changed || poolChanged;
 }
 
-function deletePlayer(index) {
+function getTalentPlayerIds() {
+    return players.map(player => player.id);
+}
+
+function isLotteryDrawn(lottery) {
+    return Array.isArray(lottery.winners) && lottery.winners.length > 0;
+}
+
+function normalizePendingLotteryPool(lottery, playerIds = getTalentPlayerIds()) {
+    const excludedIds = new Set(Array.isArray(lottery.excludedPlayerIds) ? lottery.excludedPlayerIds : []);
+    return playerIds.filter(id => !excludedIds.has(id));
+}
+
+function getLotteryExcludedPlayerIds(selectedIds) {
+    const selected = new Set(selectedIds);
+    return getTalentPlayerIds().filter(id => !selected.has(id));
+}
+
+// 未开奖抽奖池跟随人才库，并保留单个抽奖手动剔除的玩家。
+function syncLotteryPlayersWithTalent(saveAfterSync = true) {
+    const playerIds = getTalentPlayerIds();
+    let changed = false;
+
+    lotteries.forEach(lottery => {
+        if (isLotteryDrawn(lottery)) return;
+
+        const currentIds = Array.isArray(lottery.playerIds) ? lottery.playerIds : [];
+        const nextIds = normalizePendingLotteryPool(lottery, playerIds);
+        const nextExcludedIds = Array.isArray(lottery.excludedPlayerIds)
+            ? lottery.excludedPlayerIds.filter(id => playerIds.includes(id))
+            : [];
+        const isSamePool = currentIds.length === nextIds.length &&
+            currentIds.every((id, index) => id === nextIds[index]);
+        const isSameExcluded = Array.isArray(lottery.excludedPlayerIds) &&
+            lottery.excludedPlayerIds.length === nextExcludedIds.length &&
+            lottery.excludedPlayerIds.every((id, index) => id === nextExcludedIds[index]);
+
+        if (!isSamePool || !isSameExcluded) {
+            lottery.playerIds = nextIds;
+            lottery.excludedPlayerIds = nextExcludedIds;
+            changed = true;
+        }
+    });
+
+    if (changed && saveAfterSync) {
+        saveLotteries();
+        renderLotteryTable();
+    }
+
+    return changed;
+}
+
+async function deletePlayer(index) {
     if (confirm('确定删除该玩家吗？')) {
+        const deletedPlayer = players[index];
         players.splice(index, 1);
-        savePlayers();
+        let lotteriesChanged = false;
+        if (deletedPlayer) {
+            lotteriesChanged = syncLotteryPlayersWithTalent(false);
+        }
+        const playersSaved = await savePlayers();
+        if (playersSaved && lotteriesChanged) {
+            await saveLotteries();
+            renderLotteryTable();
+        }
         renderTalentTable();
     }
 }
 
-function savePlayers() {
-    fetch('/api/players', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(players)
-    }).catch(error => console.error('保存玩家数据失败:', error));
+async function savePlayers() {
+    try {
+        const response = await fetch('/api/players', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(players)
+        });
+        const result = await response.json();
+        if (!result.success) {
+            throw new Error(result.error || '保存失败');
+        }
+        return true;
+    } catch (error) {
+        console.error('保存玩家数据失败:', error);
+        alert('保存玩家数据失败：' + error.message);
+        return false;
+    }
 }
 
 // OCR导入玩家
@@ -286,7 +378,12 @@ async function handleImportPlayers(e) {
             }
         }
 
-        savePlayers();
+        const lotteriesChanged = syncLotteryPlayersWithTalent(false);
+        const playersSaved = await savePlayers();
+        if (playersSaved && lotteriesChanged) {
+            await saveLotteries();
+            renderLotteryTable();
+        }
         renderTalentTable();
         hideLoading();
         alert(`成功导入 ${imported} 个新玩家`);
@@ -1475,13 +1572,20 @@ let currentEditingLotteryIndex = null;
 // 保存抽奖数据
 async function saveLotteries() {
     try {
-        await fetch('/api/lotteries', {
+        const response = await fetch('/api/lotteries', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(lotteries)
         });
+        const result = await response.json();
+        if (!result.success) {
+            throw new Error(result.error || '保存失败');
+        }
+        return true;
     } catch (error) {
         console.error('保存抽奖数据失败:', error);
+        alert('保存抽奖数据失败：' + error.message);
+        return false;
     }
 }
 
@@ -1575,8 +1679,9 @@ function openLotteryModal(lotteryIndex = null) {
         // 填充奖品
         updatePrizesInputs(lottery.winnerCount, lottery.prizes);
 
-        // 填充玩家
-        lottery.playerIds.forEach(id => selectedLotteryPlayers.add(id));
+        // 填充玩家：未开奖抽奖池跟随人才库，同时保留本次抽奖手动剔除名单。
+        const playerIds = isDrawn ? lottery.playerIds : normalizePendingLotteryPool(lottery);
+        playerIds.forEach(id => selectedLotteryPlayers.add(id));
 
         // 如果已抽奖，禁用所有输入
         if (isDrawn) {
@@ -1595,6 +1700,7 @@ function openLotteryModal(lotteryIndex = null) {
         submitBtn.onclick = null;
         form.querySelectorAll('input, select').forEach(el => el.disabled = false);
         updatePrizesInputs(1);
+        getTalentPlayerIds().forEach(id => selectedLotteryPlayers.add(id));
     }
 
     renderLotteryPlayerList();
@@ -1646,22 +1752,24 @@ function renderLotteryPlayerList(searchTerm = '') {
 
     filteredPlayers.forEach(player => {
         const isSelected = selectedLotteryPlayers.has(player.id);
+        const lockSelection = currentEditingLotteryIndex !== null && isLotteryDrawn(lotteries[currentEditingLotteryIndex]);
         const item = document.createElement('div');
         item.style.cssText = `
             padding: 10px;
             border-bottom: 1px solid #eee;
             display: flex;
             align-items: center;
-            cursor: pointer;
+            cursor: ${lockSelection ? 'default' : 'pointer'};
         `;
 
         const checkbox = document.createElement('input');
         checkbox.type = 'checkbox';
         checkbox.checked = isSelected;
+        checkbox.disabled = lockSelection;
         checkbox.style.marginRight = '10px';
 
         const label = document.createElement('label');
-        label.style.cssText = 'flex: 1; cursor: pointer; display: flex; justify-content: space-between;';
+        label.style.cssText = `flex: 1; cursor: ${lockSelection ? 'default' : 'pointer'}; display: flex; justify-content: space-between;`;
         label.innerHTML = `
             <span style="font-weight: bold;">${player.id}</span>
             <span style="color: #666; font-size: 14px;">${player.professions.join('、')}</span>
@@ -1670,6 +1778,7 @@ function renderLotteryPlayerList(searchTerm = '') {
         // 点击整行切换checkbox和状态
         item.onclick = (e) => {
             e.stopPropagation();
+            if (lockSelection) return;
             checkbox.checked = !checkbox.checked;
 
             // 更新全局状态
@@ -1684,6 +1793,7 @@ function renderLotteryPlayerList(searchTerm = '') {
         // 点击checkbox本身也更新状态
         checkbox.onclick = (e) => {
             e.stopPropagation();
+            if (lockSelection) return;
 
             // 更新全局状态
             if (checkbox.checked) {
@@ -1710,14 +1820,25 @@ function updateLotterySelectedPreview() {
     selectedLotteryPlayers.forEach(playerId => {
         const tag = document.createElement('span');
         tag.style.cssText = `
-            display: inline-block;
-            padding: 4px 8px;
-            background: #007bff;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 5px 9px;
+            background: linear-gradient(135deg, #2c5f7a, #d3a14a);
             color: white;
-            border-radius: 4px;
+            border-radius: 6px;
             font-size: 12px;
+            cursor: pointer;
         `;
-        tag.textContent = playerId;
+        tag.title = '点击从本次待抽奖名单中剔除';
+        tag.innerHTML = `<span>${playerId}</span><span style="font-weight: 700; opacity: 0.9;">×</span>`;
+        tag.onclick = () => {
+            const lottery = currentEditingLotteryIndex !== null ? lotteries[currentEditingLotteryIndex] : null;
+            if (lottery && isLotteryDrawn(lottery)) return;
+            selectedLotteryPlayers.delete(playerId);
+            updateLotterySelectedPreview();
+            renderLotteryPlayerList(document.getElementById('lottery-player-search')?.value.trim() || '');
+        };
         tagsContainer.appendChild(tag);
     });
 
@@ -1725,13 +1846,15 @@ function updateLotterySelectedPreview() {
 }
 
 // 提交抽奖表单
-function handleLotterySubmit(e) {
+async function handleLotterySubmit(e) {
     e.preventDefault();
 
     const name = document.getElementById('lottery-name').value.trim();
     const winnerCount = parseInt(document.getElementById('lottery-winner-count').value);
     const prizeInputs = document.querySelectorAll('.lottery-prize-input');
     const prizes = Array.from(prizeInputs).map(input => input.value.trim());
+    const lotteryPlayerIds = Array.from(selectedLotteryPlayers);
+    const excludedPlayerIds = getLotteryExcludedPlayerIds(lotteryPlayerIds);
 
     // 验证
     if (!name) {
@@ -1744,12 +1867,12 @@ function handleLotterySubmit(e) {
         return;
     }
 
-    if (selectedLotteryPlayers.size === 0) {
+    if (lotteryPlayerIds.length === 0) {
         alert('请补充信息');
         return;
     }
 
-    if (selectedLotteryPlayers.size < winnerCount) {
+    if (lotteryPlayerIds.length < winnerCount) {
         alert('玩家名单数不能少于可中奖人数');
         return;
     }
@@ -1759,7 +1882,8 @@ function handleLotterySubmit(e) {
         name,
         winnerCount,
         prizes,
-        playerIds: Array.from(selectedLotteryPlayers),
+        playerIds: lotteryPlayerIds,
+        excludedPlayerIds,
         createTime: currentEditingLotteryIndex !== null ? lotteries[currentEditingLotteryIndex].createTime : new Date().toISOString(),
         winners: currentEditingLotteryIndex !== null ? lotteries[currentEditingLotteryIndex].winners : null
     };
@@ -1770,9 +1894,11 @@ function handleLotterySubmit(e) {
         lotteries.push(lotteryData);
     }
 
-    saveLotteries();
-    renderLotteryTable();
-    closeLotteryModal();
+    const saved = await saveLotteries();
+    if (saved) {
+        renderLotteryTable();
+        closeLotteryModal();
+    }
 }
 
 // 编辑抽奖
@@ -1786,11 +1912,13 @@ function viewLottery(index) {
 }
 
 // 删除抽奖
-function deleteLottery(index) {
+async function deleteLottery(index) {
     if (confirm('确定删除该抽奖记录吗？')) {
         lotteries.splice(index, 1);
-        saveLotteries();
-        renderLotteryTable();
+        const saved = await saveLotteries();
+        if (saved) {
+            renderLotteryTable();
+        }
     }
 }
 
@@ -1806,8 +1934,11 @@ function drawLottery(index) {
         showLotteryAnimation(lottery.playerIds, winners, lottery.prizes, () => {
             // 动画结束后保存结果
             lottery.winners = winners;
-            saveLotteries();
-            renderLotteryTable();
+            saveLotteries().then(saved => {
+                if (saved) {
+                    renderLotteryTable();
+                }
+            });
         });
     }
 }
@@ -1912,12 +2043,25 @@ function showLotteryAnimation(allPlayers, winners, prizes, onComplete) {
     container.style.display = 'flex';
     container.innerHTML = '';
 
+    const stagePalette = {
+        ink: '#07111f',
+        deep: '#102236',
+        jade: '#7fd6c2',
+        amber: '#d6a64f',
+        coral: '#d66f5f',
+        pearl: '#f7f1df'
+    };
+
     // 创建主容器
     const animBox = document.createElement('div');
     animBox.style.cssText = `
         width: 100%;
         height: 100vh;
-        background: radial-gradient(ellipse at center, #2d0a4e 0%, #0a0015 50%, #000000 100%);
+        background:
+            linear-gradient(120deg, rgba(127, 214, 194, 0.12), transparent 28%, rgba(214, 166, 79, 0.14) 72%, transparent),
+            radial-gradient(circle at 18% 20%, rgba(214, 111, 95, 0.2), transparent 26%),
+            radial-gradient(circle at 78% 16%, rgba(127, 214, 194, 0.18), transparent 30%),
+            linear-gradient(180deg, #07111f 0%, #102236 48%, #050811 100%);
         position: relative;
         overflow: hidden;
         display: flex;
@@ -1935,10 +2079,10 @@ function showLotteryAnimation(allPlayers, winners, prizes, onComplete) {
     style.textContent = `
         @keyframes neonPulse {
             0%, 100% {
-                text-shadow: 0 0 15px #fff, 0 0 30px #fff, 0 0 45px #ff00de, 0 0 60px #ff00de, 0 0 75px #ff00de;
+                text-shadow: 0 0 18px rgba(247, 241, 223, 0.45), 0 0 42px rgba(127, 214, 194, 0.32);
             }
             50% {
-                text-shadow: 0 0 25px #fff, 0 0 40px #ff00de, 0 0 55px #ff00de, 0 0 70px #ff00de, 0 0 85px #ff00de, 0 0 100px #ff00de;
+                text-shadow: 0 0 26px rgba(247, 241, 223, 0.72), 0 0 58px rgba(214, 166, 79, 0.42);
             }
         }
         @keyframes slotSpin {
@@ -1947,12 +2091,12 @@ function showLotteryAnimation(allPlayers, winners, prizes, onComplete) {
         }
         @keyframes winnerGlow {
             0%, 100% {
-                box-shadow: 0 0 40px rgba(255, 0, 222, 0.9), 0 0 80px rgba(0, 255, 255, 0.7), 0 0 120px rgba(255, 215, 0, 0.5);
+                box-shadow: 0 0 36px rgba(214, 166, 79, 0.62), 0 0 80px rgba(127, 214, 194, 0.34), inset 0 0 42px rgba(214, 166, 79, 0.18);
                 transform: scale(1);
             }
             50% {
-                box-shadow: 0 0 60px rgba(255, 0, 222, 1), 0 0 120px rgba(0, 255, 255, 0.9), 0 0 180px rgba(255, 215, 0, 0.7);
-                transform: scale(1.08);
+                box-shadow: 0 0 58px rgba(214, 166, 79, 0.82), 0 0 110px rgba(127, 214, 194, 0.48), inset 0 0 52px rgba(247, 241, 223, 0.2);
+                transform: scale(1.035);
             }
         }
         @keyframes shimmer {
@@ -1965,25 +2109,44 @@ function showLotteryAnimation(allPlayers, winners, prizes, onComplete) {
         }
         @keyframes float {
             0%, 100% { transform: translateY(0) rotate(0deg); }
-            50% { transform: translateY(-20px) rotate(180deg); }
+            50% { transform: translateY(-28px) rotate(12deg); }
+        }
+        @keyframes stageLine {
+            0% { transform: translateX(-20%); opacity: 0.2; }
+            50% { opacity: 0.58; }
+            100% { transform: translateX(20%); opacity: 0.2; }
         }
     `;
     document.head.appendChild(style);
 
+    const stageLine = document.createElement('div');
+    stageLine.style.cssText = `
+        position: absolute;
+        width: 140%;
+        height: 1px;
+        top: 22%;
+        left: -20%;
+        background: linear-gradient(90deg, transparent, rgba(247, 241, 223, 0.42), transparent);
+        animation: stageLine 7s ease-in-out infinite;
+        z-index: 1;
+    `;
+    animBox.appendChild(stageLine);
+
     // 主标题
     const title = document.createElement('div');
     title.style.cssText = `
-        color: #fff;
-        font-size: 88px;
-        font-weight: 900;
-        text-shadow: 0 0 15px #fff, 0 0 30px #fff, 0 0 45px #ff00de, 0 0 60px #ff00de, 0 0 75px #ff00de;
-        margin-bottom: 25px;
-        letter-spacing: 20px;
+        color: ${stagePalette.pearl};
+        font-size: clamp(48px, 7vw, 88px);
+        font-weight: 800;
+        text-shadow: 0 0 18px rgba(247, 241, 223, 0.45), 0 0 42px rgba(127, 214, 194, 0.32);
+        margin-bottom: 16px;
+        letter-spacing: 10px;
         z-index: 10;
         animation: neonPulse 2s ease-in-out infinite;
-        font-family: 'Arial Black', sans-serif;
+        font-family: 'Microsoft YaHei', 'Segoe UI', sans-serif;
+        text-transform: uppercase;
     `;
-    title.textContent = '加州大乐透';
+    title.textContent = '百业抽奖仪式';
     animBox.appendChild(title);
 
     // 副标题（日期）
@@ -1991,12 +2154,12 @@ function showLotteryAnimation(allPlayers, winners, prizes, onComplete) {
     const today = new Date();
     const dateStr = `${today.getFullYear()}年${today.getMonth() + 1}月${today.getDate()}日`;
     subtitle.style.cssText = `
-        color: #00ffff;
-        font-size: 38px;
-        font-weight: 600;
-        text-shadow: 0 0 15px #00ffff, 0 0 30px #00ffff, 0 0 45px #00ffff;
-        margin-bottom: 80px;
-        letter-spacing: 8px;
+        color: rgba(247, 241, 223, 0.82);
+        font-size: clamp(18px, 2.4vw, 30px);
+        font-weight: 500;
+        text-shadow: 0 0 18px rgba(214, 166, 79, 0.24);
+        margin-bottom: 56px;
+        letter-spacing: 5px;
         z-index: 10;
     `;
     subtitle.textContent = dateStr;
@@ -2012,6 +2175,7 @@ function showLotteryAnimation(allPlayers, winners, prizes, onComplete) {
         flex-wrap: wrap;
         z-index: 10;
         padding: 0 40px;
+        max-width: 1480px;
     `;
     animBox.appendChild(displayArea);
 
@@ -2029,18 +2193,19 @@ function showLotteryAnimation(allPlayers, winners, prizes, onComplete) {
         // 奖品标签（顶部霓虹灯效果）
         const prizeLabel = document.createElement('div');
         prizeLabel.style.cssText = `
-            background: linear-gradient(90deg, #ff00de, #00ffff, #ff00de);
+            background: linear-gradient(135deg, rgba(247, 241, 223, 0.96), rgba(214, 166, 79, 0.94));
             background-size: 200% 100%;
-            color: #000;
-            padding: 18px 40px;
-            border-radius: 30px;
+            color: #102236;
+            padding: 14px 34px;
+            border: 1px solid rgba(247, 241, 223, 0.72);
+            border-radius: 8px;
             font-size: ${winners.length === 1 ? '38px' : winners.length <= 3 ? '30px' : '24px'}px;
-            font-weight: 900;
-            box-shadow: 0 0 25px rgba(255, 0, 222, 0.9), 0 0 50px rgba(0, 255, 255, 0.7), 0 5px 15px rgba(0, 0, 0, 0.5);
+            font-weight: 800;
+            box-shadow: 0 18px 42px rgba(0, 0, 0, 0.28), 0 0 34px rgba(214, 166, 79, 0.32);
             text-align: center;
             min-width: 200px;
             animation: shimmer 3s linear infinite;
-            letter-spacing: 2px;
+            letter-spacing: 1px;
         `;
         prizeLabel.textContent = prizes[index] || `奖品${index + 1}`;
         slotWrapper.appendChild(prizeLabel);
@@ -2052,15 +2217,17 @@ function showLotteryAnimation(allPlayers, winners, prizes, onComplete) {
         slotMachine.style.cssText = `
             width: ${slotWidth}px;
             height: ${slotHeight}px;
-            background: linear-gradient(135deg, rgba(10, 0, 30, 0.95) 0%, rgba(30, 0, 60, 0.98) 100%);
-            border: 6px solid #ff00de;
-            border-radius: 35px;
+            background:
+                linear-gradient(180deg, rgba(255, 255, 255, 0.08), transparent 28%),
+                linear-gradient(135deg, rgba(12, 26, 43, 0.92) 0%, rgba(7, 17, 31, 0.98) 100%);
+            border: 1px solid rgba(247, 241, 223, 0.28);
+            border-radius: 8px;
             overflow: hidden;
             position: relative;
             box-shadow:
-                0 0 40px rgba(255, 0, 222, 0.7),
-                0 0 80px rgba(0, 255, 255, 0.5),
-                inset 0 0 60px rgba(0, 0, 0, 0.9);
+                0 30px 70px rgba(0, 0, 0, 0.42),
+                0 0 42px rgba(127, 214, 194, 0.18),
+                inset 0 0 70px rgba(0, 0, 0, 0.6);
         `;
 
         // 中间高亮框（霓虹灯边框）
@@ -2073,12 +2240,12 @@ function showLotteryAnimation(allPlayers, winners, prizes, onComplete) {
             transform: translate(-50%, -50%);
             width: 92%;
             height: ${itemHeight}px;
-            border: 5px solid #00ffff;
-            border-radius: 18px;
+            border: 1px solid rgba(214, 166, 79, 0.86);
+            border-radius: 6px;
+            background: rgba(214, 166, 79, 0.08);
             box-shadow:
-                0 0 25px #00ffff,
-                0 0 50px rgba(0, 255, 255, 0.5),
-                inset 0 0 25px rgba(0, 255, 255, 0.3);
+                0 0 28px rgba(214, 166, 79, 0.48),
+                inset 0 0 24px rgba(247, 241, 223, 0.12);
             pointer-events: none;
             z-index: 3;
         `;
@@ -2122,9 +2289,13 @@ function showLotteryAnimation(allPlayers, winners, prizes, onComplete) {
                 justify-content: center;
                 font-size: ${winners.length === 1 ? '130px' : winners.length <= 3 ? '110px' : '88px'}px;
                 font-weight: 900;
-                color: #fff;
-                text-shadow: 0 0 20px #ff00de, 0 0 40px #00ffff, 0 0 60px rgba(255, 0, 222, 0.5);
-                font-family: 'Arial Black', sans-serif;
+                color: ${stagePalette.pearl};
+                text-shadow: 0 0 20px rgba(127, 214, 194, 0.34), 0 4px 16px rgba(0, 0, 0, 0.56);
+                font-family: 'Microsoft YaHei', 'Segoe UI', sans-serif;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                padding: 0 16px;
             `;
             nameItem.textContent = name;
             scrollList.appendChild(nameItem);
@@ -2141,7 +2312,7 @@ function showLotteryAnimation(allPlayers, winners, prizes, onComplete) {
             left: 0;
             right: 0;
             height: 150px;
-            background: linear-gradient(to bottom, rgba(0, 0, 0, 1) 0%, transparent 100%);
+            background: linear-gradient(to bottom, rgba(7, 17, 31, 1) 0%, rgba(7, 17, 31, 0.72) 42%, transparent 100%);
             pointer-events: none;
             z-index: 2;
         `;
@@ -2154,7 +2325,7 @@ function showLotteryAnimation(allPlayers, winners, prizes, onComplete) {
             left: 0;
             right: 0;
             height: 150px;
-            background: linear-gradient(to top, rgba(0, 0, 0, 1) 0%, transparent 100%);
+            background: linear-gradient(to top, rgba(7, 17, 31, 1) 0%, rgba(7, 17, 31, 0.72) 42%, transparent 100%);
             pointer-events: none;
             z-index: 2;
         `;
@@ -2208,16 +2379,16 @@ function showLotteryAnimation(allPlayers, winners, prizes, onComplete) {
 
     function showWinnerEffect() {
         // 更新标题
-        title.textContent = '🎉 恭喜中奖 🎉';
-        title.style.fontSize = '96px';
+        title.textContent = '恭喜中奖';
+        title.style.fontSize = 'clamp(54px, 7.2vw, 96px)';
         subtitle.style.display = 'none';
 
         // 所有轮盘变金色霓虹灯
         slots.forEach(slot => {
-            slot.slotMachine.style.borderColor = '#ffd700';
+            slot.slotMachine.style.borderColor = 'rgba(214, 166, 79, 0.95)';
             slot.slotMachine.style.animation = 'winnerGlow 1.5s ease-in-out infinite';
-            slot.highlightFrame.style.borderColor = '#ffd700';
-            slot.highlightFrame.style.boxShadow = '0 0 40px #ffd700, 0 0 80px rgba(255, 215, 0, 0.6), inset 0 0 40px rgba(255, 215, 0, 0.5)';
+            slot.highlightFrame.style.borderColor = 'rgba(247, 241, 223, 0.96)';
+            slot.highlightFrame.style.boxShadow = '0 0 40px rgba(214, 166, 79, 0.72), inset 0 0 34px rgba(247, 241, 223, 0.24)';
             slot.prizeLabel.style.animation = 'bounce 1s ease-in-out infinite';
         });
 
@@ -2230,17 +2401,18 @@ function showLotteryAnimation(allPlayers, winners, prizes, onComplete) {
     }
 
     function createParticleBackground(parent) {
-        for (let i = 0; i < 120; i++) {
+        const colors = ['rgba(247, 241, 223, 0.86)', 'rgba(127, 214, 194, 0.74)', 'rgba(214, 166, 79, 0.78)', 'rgba(214, 111, 95, 0.5)'];
+        for (let i = 0; i < 86; i++) {
             const particle = document.createElement('div');
             particle.style.cssText = `
                 position: absolute;
-                width: ${3 + Math.random() * 6}px;
-                height: ${3 + Math.random() * 6}px;
-                background: ${Math.random() > 0.5 ? '#ff00de' : '#00ffff'};
+                width: ${2 + Math.random() * 4}px;
+                height: ${2 + Math.random() * 4}px;
+                background: ${colors[Math.floor(Math.random() * colors.length)]};
                 border-radius: 50%;
                 top: ${Math.random() * 100}%;
                 left: ${Math.random() * 100}%;
-                opacity: ${0.3 + Math.random() * 0.6};
+                opacity: ${0.22 + Math.random() * 0.45};
                 box-shadow: 0 0 10px currentColor;
                 animation: float ${5 + Math.random() * 10}s ease-in-out infinite;
                 animation-delay: ${Math.random() * 5}s;
@@ -2251,7 +2423,7 @@ function showLotteryAnimation(allPlayers, winners, prizes, onComplete) {
 
     function showFinalResults() {
         displayArea.innerHTML = '';
-        title.textContent = '🎉 中奖名单 🎉';
+        title.textContent = '中奖名单';
 
         const resultsContainer = document.createElement('div');
         resultsContainer.style.cssText = `
@@ -2265,14 +2437,16 @@ function showLotteryAnimation(allPlayers, winners, prizes, onComplete) {
         winners.forEach((winner, i) => {
             const resultCard = document.createElement('div');
             resultCard.style.cssText = `
-                background: linear-gradient(135deg, rgba(255, 0, 222, 0.35) 0%, rgba(0, 255, 255, 0.35) 100%);
-                border: 8px solid #ffd700;
-                border-radius: 40px;
+                background:
+                    linear-gradient(180deg, rgba(255, 255, 255, 0.1), transparent 30%),
+                    linear-gradient(135deg, rgba(16, 34, 54, 0.92), rgba(7, 17, 31, 0.96));
+                border: 1px solid rgba(214, 166, 79, 0.82);
+                border-radius: 8px;
                 padding: ${winners.length === 1 ? '90px 110px' : winners.length <= 3 ? '70px 90px' : '50px 70px'};
                 text-align: center;
-                box-shadow: 0 0 60px rgba(255, 215, 0, 1), 0 0 120px rgba(255, 0, 222, 0.7), 0 10px 30px rgba(0, 0, 0, 0.5);
+                box-shadow: 0 35px 90px rgba(0, 0, 0, 0.48), 0 0 58px rgba(214, 166, 79, 0.34);
                 opacity: 0;
-                transform: scale(0.3) rotateZ(-180deg);
+                transform: translateY(30px) scale(0.92);
                 position: relative;
                 overflow: hidden;
             `;
@@ -2285,7 +2459,7 @@ function showLotteryAnimation(allPlayers, winners, prizes, onComplete) {
                 left: -100%;
                 width: 50%;
                 height: 200%;
-                background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+                background: linear-gradient(90deg, transparent, rgba(247, 241, 223, 0.35), transparent);
                 transform: skewX(-20deg);
                 animation: shimmer 2s infinite;
             `;
@@ -2296,8 +2470,8 @@ function showLotteryAnimation(allPlayers, winners, prizes, onComplete) {
             prizeText.style.cssText = `
                 font-size: ${winners.length === 1 ? '42px' : winners.length <= 3 ? '32px' : '26px'}px;
                 font-weight: 700;
-                color: #00ffff;
-                text-shadow: 0 0 20px #00ffff, 0 0 40px #00ffff;
+                color: ${stagePalette.jade};
+                text-shadow: 0 0 22px rgba(127, 214, 194, 0.32);
                 margin-bottom: 25px;
                 position: relative;
                 z-index: 1;
@@ -2311,11 +2485,11 @@ function showLotteryAnimation(allPlayers, winners, prizes, onComplete) {
             winnerText.style.cssText = `
                 font-size: ${winners.length === 1 ? '160px' : winners.length <= 3 ? '115px' : '85px'}px;
                 font-weight: 900;
-                color: #ffd700;
-                text-shadow: 0 0 35px #ffd700, 0 0 70px #ff00de, 0 5px 20px rgba(0, 0, 0, 0.5);
+                color: ${stagePalette.pearl};
+                text-shadow: 0 0 30px rgba(214, 166, 79, 0.45), 0 5px 20px rgba(0, 0, 0, 0.5);
                 position: relative;
                 z-index: 1;
-                font-family: 'Arial Black', sans-serif;
+                font-family: 'Microsoft YaHei', 'Segoe UI', sans-serif;
             `;
             winnerText.textContent = winner;
             resultCard.appendChild(winnerText);
@@ -2324,9 +2498,9 @@ function showLotteryAnimation(allPlayers, winners, prizes, onComplete) {
 
             // 逐个弹出动画
             setTimeout(() => {
-                resultCard.style.transition = 'all 1s cubic-bezier(0.68, -0.55, 0.265, 1.55)';
+                resultCard.style.transition = 'all 0.9s cubic-bezier(0.2, 0.9, 0.2, 1)';
                 resultCard.style.opacity = '1';
-                resultCard.style.transform = 'scale(1) rotateZ(0deg)';
+                resultCard.style.transform = 'translateY(0) scale(1)';
             }, i * 500);
         });
 
@@ -2340,13 +2514,14 @@ function showLotteryAnimation(allPlayers, winners, prizes, onComplete) {
     }
 
     function createFireworks(parent) {
-        for (let i = 0; i < 80; i++) {
+        const sparks = ['#f7f1df', '#d6a64f', '#7fd6c2', '#d66f5f'];
+        for (let i = 0; i < 70; i++) {
             const particle = document.createElement('div');
             particle.style.cssText = `
                 position: absolute;
-                width: ${12 + Math.random() * 10}px;
-                height: ${12 + Math.random() * 10}px;
-                background: ${['#ffd700', '#ff00de', '#00ffff', '#ff6b6b', '#4ecdc4'][Math.floor(Math.random() * 5)]};
+                width: ${8 + Math.random() * 8}px;
+                height: ${8 + Math.random() * 8}px;
+                background: ${sparks[Math.floor(Math.random() * sparks.length)]};
                 border-radius: 50%;
                 top: 50%;
                 left: 50%;
@@ -2384,19 +2559,19 @@ function showLotteryAnimation(allPlayers, winners, prizes, onComplete) {
     }
 
     function createLightBurst(parent) {
-        for (let i = 0; i < 16; i++) {
+        for (let i = 0; i < 14; i++) {
             const beam = document.createElement('div');
             beam.style.cssText = `
                 position: absolute;
-                width: 8px;
+                width: 4px;
                 height: 500px;
                 background: linear-gradient(to bottom,
-                    ${i % 2 === 0 ? 'rgba(255, 0, 222, 1)' : 'rgba(0, 255, 255, 1)'},
+                    ${i % 2 === 0 ? 'rgba(214, 166, 79, 0.84)' : 'rgba(127, 214, 194, 0.72)'},
                     transparent);
                 top: 50%;
                 left: 50%;
                 transform-origin: top center;
-                transform: translate(-50%, -50%) rotate(${i * 22.5}deg);
+                transform: translate(-50%, -50%) rotate(${i * 25.7}deg);
                 pointer-events: none;
                 opacity: 1;
                 box-shadow: 0 0 20px currentColor;
