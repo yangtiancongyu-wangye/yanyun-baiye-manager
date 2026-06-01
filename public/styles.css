@@ -928,6 +928,54 @@ tbody tr:hover {
     box-shadow: 0 2px 8px rgba(94, 179, 214, 0.3);
 }
 
+.lottery-selected-tag {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    padding: 6px 12px;
+    padding-right: 30px;
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+    color: white;
+    border-radius: 6px;
+    font-size: 13px;
+    cursor: default;
+    box-shadow: 0 2px 8px rgba(94, 179, 214, 0.3);
+}
+
+.lottery-selected-tag-label {
+    display: inline-block;
+    white-space: nowrap;
+}
+
+.lottery-selected-tag-delete {
+    position: absolute;
+    top: 50%;
+    right: 7px;
+    transform: translateY(-50%);
+    width: 16px;
+    height: 16px;
+    border: 0;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.18);
+    color: white;
+    font-size: 12px;
+    line-height: 1;
+    cursor: pointer;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.18s ease, background 0.18s ease, transform 0.18s ease;
+}
+
+.lottery-selected-tag:hover .lottery-selected-tag-delete,
+.lottery-selected-tag:focus-within .lottery-selected-tag-delete {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.lottery-selected-tag:hover .lottery-selected-tag-delete {
+    background: rgba(255, 255, 255, 0.32);
+}
+
 #lottery-selected-preview {
     background: linear-gradient(135deg, rgba(247, 251, 252, 0.96), rgba(255, 249, 238, 0.9)) !important;
     border: 1px solid rgba(211, 161, 74, 0.22);

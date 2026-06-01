@@ -1819,20 +1819,15 @@ function updateLotterySelectedPreview() {
 
     selectedLotteryPlayers.forEach(playerId => {
         const tag = document.createElement('span');
-        tag.style.cssText = `
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            padding: 5px 9px;
-            background: linear-gradient(135deg, #2c5f7a, #d3a14a);
-            color: white;
-            border-radius: 6px;
-            font-size: 12px;
-            cursor: pointer;
-        `;
+        tag.className = 'lottery-selected-tag';
         tag.title = '点击从本次待抽奖名单中剔除';
-        tag.innerHTML = `<span>${playerId}</span><span style="font-weight: 700; opacity: 0.9;">×</span>`;
-        tag.onclick = () => {
+        tag.innerHTML = `
+            <span class="lottery-selected-tag-label">${playerId}</span>
+            <button type="button" class="lottery-selected-tag-delete" aria-label="删除玩家">×</button>
+        `;
+        const deleteBtn = tag.querySelector('.lottery-selected-tag-delete');
+        deleteBtn.onclick = (e) => {
+            e.stopPropagation();
             const lottery = currentEditingLotteryIndex !== null ? lotteries[currentEditingLotteryIndex] : null;
             if (lottery && isLotteryDrawn(lottery)) return;
             selectedLotteryPlayers.delete(playerId);
