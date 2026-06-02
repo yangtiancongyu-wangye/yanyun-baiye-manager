@@ -902,34 +902,17 @@ function mergeLotteryHistory(existingLotteries, incomingLotteries) {
         existingById.set(lottery.id, lottery);
     }
 
-    const merged = [];
-    const seen = new Set();
+    return (Array.isArray(incomingLotteries) ? incomingLotteries : []).map(incoming => {
+        const existing = existingById.get(incoming.id);
+        if (!existing) return incoming;
 
-    for (const existing of Array.isArray(existingLotteries) ? existingLotteries : []) {
-        const incoming = Array.isArray(incomingLotteries)
-            ? incomingLotteries.find(lottery => lottery.id === existing.id)
-            : null;
-
-        if (incoming) {
-            merged.push({
-                ...existing,
-                ...incoming,
-                id: existing.id,
-                createTime: existing.createTime || incoming.createTime,
-                winners: incoming.winners ?? existing.winners
-            });
-            seen.add(existing.id);
-        } else {
-            merged.push(existing);
-        }
-    }
-
-    for (const incoming of Array.isArray(incomingLotteries) ? incomingLotteries : []) {
-        if (seen.has(incoming.id) || existingById.has(incoming.id)) continue;
-        merged.push(incoming);
-    }
-
-    return merged;
+        return {
+            ...incoming,
+            id: existing.id,
+            createTime: incoming.createTime || existing.createTime,
+            winners: incoming.winners ?? existing.winners
+        };
+    });
 }
 
 // 启动时从 GitHub 拉取最新数据

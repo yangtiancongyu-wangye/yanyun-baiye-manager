@@ -2086,15 +2086,20 @@ function renderArcheryEggLotteryAnimation(container, allPlayers, winners, prizes
         <div class="archery-mascot-dog" aria-hidden="true">
             <span class="dog-tail"></span>
             <span class="dog-body"></span>
+            <span class="dog-chest"></span>
             <span class="dog-head"><i class="dog-ear left"></i><i class="dog-ear right"></i><b class="dog-face"></b></span>
             <span class="dog-scarf"></span>
+            <span class="dog-cheek left"></span>
+            <span class="dog-cheek right"></span>
             <span class="dog-leg front"></span>
             <span class="dog-leg back"></span>
         </div>
         <div class="archery-mascot-cat" aria-hidden="true">
             <span class="cat-tail"></span>
+            <span class="cat-cape"></span>
             <span class="cat-body"></span>
-            <span class="cat-head"><i class="cat-ear left"></i><i class="cat-ear right"></i><b class="cat-face"></b></span>
+            <span class="cat-head"><i class="cat-ear left"></i><i class="cat-ear right"></i><i class="cat-crown"></i><b class="cat-face"></b></span>
+            <span class="cat-collar"></span>
             <span class="cat-arm bow-arm"></span>
             <span class="cat-arm string-arm"></span>
             <span class="cat-paw front"></span>
@@ -2668,25 +2673,32 @@ function renderArcheryEggLotteryAnimation(container, allPlayers, winners, prizes
 
         return {
             draw() {
-                tone({ frequency: 160, endFrequency: 90, duration: 0.48, type: 'triangle', gain: 0.08 });
-                tone({ frequency: 420, endFrequency: 280, duration: 0.38, type: 'sine', gain: 0.035, delay: 0.08 });
+                tone({ frequency: 132, endFrequency: 72, duration: 0.62, type: 'triangle', gain: 0.07 });
+                tone({ frequency: 246, endFrequency: 180, duration: 0.48, type: 'sine', gain: 0.032, delay: 0.05 });
+                tone({ frequency: 520, endFrequency: 360, duration: 0.22, type: 'triangle', gain: 0.026, delay: 0.18 });
+                noise({ duration: 0.18, gain: 0.025, filter: 420, delay: 0.04 });
             },
             release() {
-                noise({ duration: 0.32, gain: 0.11, filter: 1700 });
-                tone({ frequency: 720, endFrequency: 180, duration: 0.28, type: 'sawtooth', gain: 0.055 });
+                tone({ frequency: 920, endFrequency: 240, duration: 0.24, type: 'sawtooth', gain: 0.05 });
+                tone({ frequency: 1380, endFrequency: 620, duration: 0.18, type: 'triangle', gain: 0.026, delay: 0.02 });
+                noise({ duration: 0.36, gain: 0.095, filter: 1900 });
+                noise({ duration: 0.22, gain: 0.045, filter: 3100, delay: 0.08 });
             },
             hit() {
-                noise({ duration: 0.42, gain: 0.14, filter: 520 });
-                tone({ frequency: 130, endFrequency: 60, duration: 0.36, type: 'square', gain: 0.08 });
-                tone({ frequency: 880, endFrequency: 440, duration: 0.18, type: 'triangle', gain: 0.04, delay: 0.02 });
+                noise({ duration: 0.16, gain: 0.11, filter: 720 });
+                noise({ duration: 0.28, gain: 0.06, filter: 2300, delay: 0.04 });
+                tone({ frequency: 150, endFrequency: 68, duration: 0.34, type: 'square', gain: 0.07 });
+                tone({ frequency: 740, endFrequency: 1180, duration: 0.16, type: 'triangle', gain: 0.032, delay: 0.03 });
+                tone({ frequency: 1180, endFrequency: 820, duration: 0.2, type: 'sine', gain: 0.03, delay: 0.13 });
             },
             hen() {
-                noise({ duration: 0.16, gain: 0.11, filter: 1200 });
-                tone({ frequency: 520, endFrequency: 760, duration: 0.12, type: 'square', gain: 0.045, delay: 0.02 });
-                tone({ frequency: 760, endFrequency: 430, duration: 0.16, type: 'square', gain: 0.045, delay: 0.17 });
-                noise({ duration: 0.18, gain: 0.12, filter: 950, delay: 0.34 });
-                tone({ frequency: 620, endFrequency: 820, duration: 0.11, type: 'square', gain: 0.04, delay: 0.36 });
-                tone({ frequency: 180, endFrequency: 90, duration: 0.3, type: 'triangle', gain: 0.07, delay: 0.58 });
+                noise({ duration: 0.12, gain: 0.07, filter: 1500 });
+                tone({ frequency: 392, endFrequency: 392, duration: 0.11, type: 'triangle', gain: 0.04, delay: 0.02 });
+                tone({ frequency: 523, endFrequency: 523, duration: 0.12, type: 'triangle', gain: 0.042, delay: 0.13 });
+                tone({ frequency: 659, endFrequency: 659, duration: 0.14, type: 'triangle', gain: 0.043, delay: 0.25 });
+                tone({ frequency: 784, endFrequency: 620, duration: 0.22, type: 'sine', gain: 0.034, delay: 0.4 });
+                noise({ duration: 0.2, gain: 0.05, filter: 2600, delay: 0.24 });
+                tone({ frequency: 196, endFrequency: 110, duration: 0.34, type: 'triangle', gain: 0.045, delay: 0.56 });
             }
         };
     }
@@ -2922,37 +2934,53 @@ function ensureArcheryLotteryStyles() {
             pointer-events: none;
         }
         .archery-mascot-cat {
-            left: 10%;
-            bottom: 11%;
-            width: 150px;
-            height: 220px;
+            left: 8%;
+            bottom: 9%;
+            width: 166px;
+            height: 232px;
             animation: catBreath 3.4s ease-in-out infinite;
             transform-origin: 50% 88%;
             z-index: 3;
         }
+        .cat-cape {
+            position: absolute;
+            left: 16px;
+            bottom: 34px;
+            width: 112px;
+            height: 122px;
+            border-radius: 54% 28% 56% 36%;
+            background:
+                linear-gradient(140deg, rgba(255, 247, 230, 0.72) 0 12px, transparent 13px),
+                linear-gradient(145deg, #7c2d28 0%, #b33931 56%, #5a2322 100%);
+            box-shadow: inset -16px -14px 20px rgba(49, 21, 20, 0.22), 0 18px 26px rgba(0, 0, 0, 0.2);
+            transform: rotate(-9deg);
+            z-index: 0;
+        }
         .cat-body {
             position: absolute;
-            left: 36px;
+            left: 43px;
             bottom: 26px;
-            width: 86px;
-            height: 116px;
-            border-radius: 48% 48% 42% 42%;
+            width: 90px;
+            height: 120px;
+            border-radius: 48% 48% 44% 44%;
             background:
-                radial-gradient(circle at 30% 24%, rgba(255,255,255,0.96), transparent 28%),
-                linear-gradient(145deg, #fffdf2 0%, #f3eadc 60%, #d7c7b6 100%);
+                radial-gradient(ellipse at 49% 58%, #f7d8b8 0 22px, transparent 23px),
+                radial-gradient(circle at 30% 24%, rgba(255,255,255,0.98), transparent 29%),
+                linear-gradient(145deg, #fffef6 0%, #f2e7d9 62%, #d8c5b4 100%);
             border: 2px solid rgba(95, 74, 56, 0.24);
-            box-shadow: inset -12px -16px 20px rgba(123, 94, 70, 0.12), 0 16px 22px rgba(0, 0, 0, 0.2);
+            box-shadow: inset -14px -18px 22px rgba(123, 94, 70, 0.12), 0 16px 22px rgba(0, 0, 0, 0.2);
+            z-index: 2;
         }
         .cat-head {
             position: absolute;
-            left: 25px;
-            top: 24px;
-            width: 96px;
-            height: 86px;
-            border-radius: 47% 47% 45% 45%;
+            left: 28px;
+            top: 21px;
+            width: 108px;
+            height: 94px;
+            border-radius: 48% 48% 45% 45%;
             background:
                 radial-gradient(circle at 31% 28%, rgba(255,255,255,0.95), transparent 28%),
-                linear-gradient(145deg, #fffef5 0%, #efe4d5 100%);
+                linear-gradient(145deg, #fffef8 0%, #efe3d4 100%);
             border: 2px solid rgba(95, 74, 56, 0.22);
             box-shadow: inset -10px -12px 18px rgba(126, 95, 70, 0.12), 0 10px 18px rgba(0, 0, 0, 0.16);
             z-index: 4;
@@ -2967,11 +2995,11 @@ function ensureArcheryLotteryStyles() {
             clip-path: polygon(50% 0, 100% 100%, 0 100%);
         }
         .cat-ear.left {
-            left: 12px;
+            left: 15px;
             transform: rotate(-18deg);
         }
         .cat-ear.right {
-            right: 10px;
+            right: 14px;
             transform: rotate(17deg);
         }
         .cat-ear::after {
@@ -2985,22 +3013,50 @@ function ensureArcheryLotteryStyles() {
             clip-path: polygon(50% 0, 100% 100%, 0 100%);
             opacity: 0.75;
         }
+        .cat-crown {
+            position: absolute;
+            left: 34px;
+            top: -28px;
+            width: 40px;
+            height: 30px;
+            background: linear-gradient(180deg, #ffe58f, #d39a2f);
+            clip-path: polygon(0 100%, 0 32%, 24% 68%, 50% 4%, 76% 68%, 100% 32%, 100% 100%);
+            filter: drop-shadow(0 4px 4px rgba(62, 32, 13, 0.28));
+            z-index: 5;
+        }
+        .cat-crown::before,
+        .cat-crown::after {
+            content: '';
+            position: absolute;
+            top: 8px;
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: #b81f3a;
+        }
+        .cat-crown::before {
+            left: 3px;
+            box-shadow: 17px -5px 0 #7fd6c2;
+        }
+        .cat-crown::after {
+            right: 3px;
+        }
         .cat-face::before,
         .cat-face::after {
             content: '';
             position: absolute;
-            top: 35px;
-            width: 9px;
-            height: 13px;
+            top: 38px;
+            width: 10px;
+            height: 14px;
             border-radius: 50%;
             background: #33251f;
             box-shadow: 0 0 0 3px rgba(255,255,255,0.34);
         }
         .cat-face::before {
-            left: 30px;
+            left: 34px;
         }
         .cat-face::after {
-            right: 30px;
+            right: 34px;
         }
         .cat-face {
             position: absolute;
@@ -3012,9 +3068,11 @@ function ensureArcheryLotteryStyles() {
         }
         .cat-face {
             background:
-                radial-gradient(circle at 50% 52%, #d88273 0 4px, transparent 5px),
-                radial-gradient(ellipse at 42% 62%, rgba(179, 103, 88, 0.42) 0 8px, transparent 9px),
-                radial-gradient(ellipse at 58% 62%, rgba(179, 103, 88, 0.42) 0 8px, transparent 9px);
+                linear-gradient(12deg, transparent 0 45%, rgba(91, 58, 39, 0.5) 46% 47%, transparent 48%),
+                linear-gradient(-12deg, transparent 0 45%, rgba(91, 58, 39, 0.5) 46% 47%, transparent 48%),
+                radial-gradient(circle at 50% 53%, #d47b70 0 4px, transparent 5px),
+                radial-gradient(ellipse at 41% 64%, rgba(209, 105, 92, 0.34) 0 9px, transparent 10px),
+                radial-gradient(ellipse at 59% 64%, rgba(209, 105, 92, 0.34) 0 9px, transparent 10px);
         }
         .cat-face::selection {
             background: transparent;
@@ -3022,20 +3080,50 @@ function ensureArcheryLotteryStyles() {
         .cat-head::after {
             content: '';
             position: absolute;
-            left: 31px;
-            top: 54px;
-            width: 34px;
+            left: 36px;
+            top: 58px;
+            width: 36px;
             height: 15px;
             border-bottom: 3px solid rgba(77, 48, 35, 0.65);
             border-radius: 0 0 50% 50%;
         }
+        .cat-collar {
+            position: absolute;
+            left: 53px;
+            top: 126px;
+            width: 72px;
+            height: 20px;
+            z-index: 5;
+        }
+        .cat-collar::before,
+        .cat-collar::after {
+            content: '';
+            position: absolute;
+            top: 2px;
+            width: 31px;
+            height: 18px;
+            background: linear-gradient(145deg, #d54636, #8f2425);
+            border-radius: 50% 12% 50% 12%;
+            box-shadow: inset -5px -4px 8px rgba(45, 15, 13, 0.2);
+        }
+        .cat-collar::before {
+            left: 5px;
+            transform: rotate(18deg);
+        }
+        .cat-collar::after {
+            right: 5px;
+            transform: rotate(-18deg) scaleX(-1);
+        }
+        .cat-collar {
+            background: radial-gradient(circle at 50% 60%, #f5c45f 0 5px, transparent 6px);
+        }
         .cat-tail {
             position: absolute;
-            left: 5px;
-            bottom: 44px;
-            width: 58px;
-            height: 94px;
-            border: 13px solid #efe3d2;
+            left: 0;
+            bottom: 47px;
+            width: 62px;
+            height: 102px;
+            border: 14px solid #efe3d2;
             border-right: 0;
             border-bottom: 0;
             border-radius: 70% 0 0 0;
@@ -3054,20 +3142,20 @@ function ensureArcheryLotteryStyles() {
             transition: transform 0.25s ease;
         }
         .cat-arm.bow-arm {
-            left: 88px;
-            top: 105px;
-            transform: rotate(-10deg);
+            left: 96px;
+            top: 111px;
+            transform: rotate(-14deg);
         }
         .cat-arm.string-arm {
-            left: 68px;
-            top: 117px;
-            transform: rotate(9deg);
+            left: 72px;
+            top: 121px;
+            transform: rotate(10deg);
         }
         .archery-bow.is-drawn .cat-arm.string-arm {
-            transform: translateX(-18px) rotate(18deg);
+            transform: translateX(-22px) rotate(20deg);
         }
         .archery-bow.is-drawn .cat-arm.bow-arm {
-            transform: rotate(-16deg);
+            transform: rotate(-19deg);
         }
         .cat-paw {
             position: absolute;
@@ -3079,16 +3167,16 @@ function ensureArcheryLotteryStyles() {
             z-index: 6;
         }
         .cat-paw.front {
-            right: 10px;
-            top: 100px;
+            right: -2px;
+            top: 106px;
         }
         .cat-paw.back {
-            left: 54px;
-            top: 112px;
+            left: 58px;
+            top: 116px;
             transition: transform 0.25s ease;
         }
         .archery-bow.is-drawn .cat-paw.back {
-            transform: translateX(-20px);
+            transform: translateX(-24px);
         }
         .cat-foot {
             position: absolute;
@@ -3100,49 +3188,62 @@ function ensureArcheryLotteryStyles() {
             border: 2px solid rgba(95, 74, 56, 0.16);
         }
         .cat-foot.front {
-            left: 80px;
+            left: 88px;
         }
         .cat-foot.back {
-            left: 35px;
+            left: 39px;
         }
         .archery-mascot-dog {
-            left: 3%;
-            bottom: 4%;
-            width: 104px;
-            height: 126px;
+            left: 1%;
+            bottom: 3%;
+            width: 126px;
+            height: 140px;
             animation: dogBob 2.9s ease-in-out infinite;
             transform-origin: 50% 100%;
             z-index: 2;
         }
         .dog-body {
             position: absolute;
-            left: 25px;
+            left: 28px;
             bottom: 20px;
-            width: 66px;
-            height: 58px;
+            width: 80px;
+            height: 65px;
             border-radius: 48% 44% 42% 40%;
-            background: linear-gradient(145deg, #d98937 0%, #c46a2c 70%, #8f4724 100%);
+            background:
+                radial-gradient(ellipse at 48% 64%, #f7d2a1 0 22px, transparent 23px),
+                linear-gradient(145deg, #e1973d 0%, #c86b2e 70%, #914623 100%);
             border: 2px solid rgba(70, 42, 24, 0.24);
             box-shadow: inset -9px -9px 16px rgba(91, 50, 25, 0.2), 0 12px 18px rgba(0,0,0,0.18);
         }
+        .dog-chest {
+            position: absolute;
+            left: 52px;
+            bottom: 33px;
+            width: 35px;
+            height: 38px;
+            border-radius: 50%;
+            background: #fff0d3;
+            z-index: 2;
+            box-shadow: inset -5px -6px 8px rgba(164, 91, 40, 0.14);
+        }
         .dog-head {
             position: absolute;
-            left: 30px;
-            top: 25px;
-            width: 62px;
-            height: 58px;
+            left: 36px;
+            top: 23px;
+            width: 70px;
+            height: 64px;
             border-radius: 46% 48% 45% 45%;
             background:
-                radial-gradient(circle at 50% 66%, #fff2d8 0 20px, transparent 21px),
-                linear-gradient(145deg, #df933e, #bd642b);
+                radial-gradient(circle at 50% 67%, #fff2d8 0 23px, transparent 24px),
+                linear-gradient(145deg, #e59a41, #be632b);
             border: 2px solid rgba(70, 42, 24, 0.22);
             z-index: 3;
         }
         .dog-ear {
             position: absolute;
-            top: -12px;
-            width: 24px;
-            height: 31px;
+            top: -14px;
+            width: 27px;
+            height: 35px;
             background: #a95127;
             clip-path: polygon(50% 0, 100% 100%, 0 72%);
         }
@@ -3158,47 +3259,63 @@ function ensureArcheryLotteryStyles() {
         .dog-face::after {
             content: '';
             position: absolute;
-            top: 25px;
-            width: 7px;
-            height: 9px;
+            top: 27px;
+            width: 8px;
+            height: 10px;
             border-radius: 50%;
             background: #33251f;
+            box-shadow: 0 0 0 3px rgba(255, 236, 198, 0.22);
         }
         .dog-face::before {
-            left: 19px;
+            left: 21px;
         }
         .dog-face::after {
-            right: 19px;
+            right: 21px;
         }
         .dog-head::after {
             content: '';
             position: absolute;
-            left: 29px;
-            top: 37px;
-            width: 7px;
-            height: 6px;
+            left: 32px;
+            top: 39px;
+            width: 8px;
+            height: 7px;
             border-radius: 50%;
             background: #4a2d20;
-            box-shadow: 0 8px 0 -2px rgba(74, 45, 32, 0.7);
+            box-shadow: 0 9px 0 -2px rgba(74, 45, 32, 0.7);
+        }
+        .dog-cheek {
+            position: absolute;
+            top: 62px;
+            width: 14px;
+            height: 9px;
+            border-radius: 50%;
+            background: rgba(219, 93, 72, 0.28);
+            z-index: 4;
+        }
+        .dog-cheek.left {
+            left: 42px;
+        }
+        .dog-cheek.right {
+            left: 88px;
         }
         .dog-tail {
             position: absolute;
-            left: 8px;
-            bottom: 54px;
-            width: 36px;
-            height: 22px;
-            border: 9px solid #c46a2c;
-            border-right: 0;
-            border-bottom: 0;
-            border-radius: 80% 0 0 0;
-            transform-origin: 100% 80%;
+            left: 6px;
+            bottom: 58px;
+            width: 44px;
+            height: 34px;
+            border: 10px solid #c86b2e;
+            border-left-color: #e1973d;
+            border-bottom-color: transparent;
+            border-radius: 50%;
+            transform-origin: 88% 82%;
             animation: tailWag 0.56s ease-in-out infinite;
         }
         .dog-scarf {
             position: absolute;
-            left: 31px;
-            top: 72px;
-            width: 54px;
+            left: 38px;
+            top: 77px;
+            width: 64px;
             height: 12px;
             border-radius: 999px;
             background: linear-gradient(90deg, #d54636, #f5c45f);
@@ -3208,16 +3325,16 @@ function ensureArcheryLotteryStyles() {
         .dog-leg {
             position: absolute;
             bottom: 8px;
-            width: 15px;
-            height: 28px;
+            width: 17px;
+            height: 30px;
             border-radius: 9px;
             background: #a95127;
         }
         .dog-leg.front {
-            left: 69px;
+            left: 82px;
         }
         .dog-leg.back {
-            left: 34px;
+            left: 39px;
         }
         .archery-charge-ring {
             position: absolute;
