@@ -2297,8 +2297,9 @@ function renderArcheryEggLotteryAnimation(container, allPlayers, winners, prizes
         const targetY = eggRect.top - fieldRect.top + eggRect.height * 0.5;
         const bowRect = bow.getBoundingClientRect();
         const bowLeft = bowRect.left - fieldRect.left;
-        const startX = bowLeft + bowRect.width * (bowRect.width <= 130 ? 0.56 : 0.73);
-        const startY = bowRect.top - fieldRect.top + bowRect.height * (bowRect.width <= 130 ? 0.44 : 0.42);
+        const bowTop = bowRect.top - fieldRect.top;
+        const startX = bowLeft + bowRect.width * (bowRect.width <= 130 ? 0.76 : 0.68);
+        const startY = bowTop + bowRect.height * (bowRect.width <= 130 ? 0.36 : 0.38);
         const distanceX = targetX - startX;
         const distanceY = targetY - startY;
         const angle = Math.atan2(distanceY, distanceX) * 180 / Math.PI;
@@ -3022,14 +3023,15 @@ function ensureArcheryLotteryStyles() {
         }
         .archery-bow-arc {
             position: absolute;
-            right: 8%;
-            top: 13%;
-            width: 68px;
-            height: 68%;
+            left: 58%;
+            top: 14%;
+            width: 58px;
+            height: 58%;
             border-right: 9px solid #c98743;
             border-radius: 0 100% 100% 0;
-            transform: rotate(-2deg);
+            transform: rotate(-5deg);
             filter: drop-shadow(0 0 16px rgba(246, 212, 142, 0.24));
+            z-index: 7;
         }
         .archery-bow-arc::before,
         .archery-bow-arc::after {
@@ -3050,29 +3052,31 @@ function ensureArcheryLotteryStyles() {
         }
         .archery-bow-string {
             position: absolute;
-            top: 16%;
-            bottom: 18%;
-            right: 17%;
+            top: 17%;
+            bottom: 25%;
+            left: 70%;
             width: 2px;
             background: rgba(255, 247, 230, 0.8);
             transform-origin: center;
             transition: transform 0.25s ease;
+            z-index: 6;
         }
         .archery-bow.is-drawn .archery-bow-string {
-            transform: translateX(-42px);
+            transform: translateX(-40px);
             background: #fff7e6;
             box-shadow: 0 0 18px rgba(245, 196, 95, 0.76);
         }
         .archery-bow-grip {
             position: absolute;
-            right: 12%;
-            top: 42%;
-            width: 18px;
-            height: 50px;
+            left: 64%;
+            top: 36%;
+            width: 16px;
+            height: 42px;
             border-radius: 10px;
             background: linear-gradient(180deg, #6f4328, #b06e38 48%, #5a3825);
             box-shadow: inset 0 0 8px rgba(255, 247, 230, 0.25);
-            transform: rotate(-2deg);
+            transform: rotate(-5deg);
+            z-index: 8;
         }
         .archery-mascot-cat,
         .archery-mascot-dog {
@@ -3080,13 +3084,13 @@ function ensureArcheryLotteryStyles() {
             pointer-events: none;
         }
         .archery-mascot-cat {
-            left: 2%;
-            bottom: 9%;
+            left: 10%;
+            bottom: 23%;
             width: 142px;
             height: 214px;
             animation: catBreath 3.4s ease-in-out infinite;
             transform-origin: 50% 88%;
-            z-index: 4;
+            z-index: 5;
         }
         .cat-cape {
             position: absolute;
@@ -3290,20 +3294,24 @@ function ensureArcheryLotteryStyles() {
             transition: transform 0.25s ease;
         }
         .cat-arm.bow-arm {
-            left: 76px;
-            top: 98px;
-            transform: rotate(-14deg);
+            left: 72px;
+            top: 94px;
+            width: 54px;
+            transform: rotate(-9deg);
+            z-index: 9;
         }
         .cat-arm.string-arm {
-            left: 55px;
-            top: 106px;
-            transform: rotate(10deg);
+            left: 43px;
+            top: 103px;
+            width: 58px;
+            transform: rotate(7deg);
+            z-index: 9;
         }
         .archery-bow.is-drawn .cat-arm.string-arm {
-            transform: translateX(-22px) rotate(20deg);
+            transform: translateX(-24px) rotate(18deg);
         }
         .archery-bow.is-drawn .cat-arm.bow-arm {
-            transform: rotate(-19deg);
+            transform: rotate(-13deg);
         }
         .cat-paw {
             position: absolute;
@@ -3315,16 +3323,18 @@ function ensureArcheryLotteryStyles() {
             z-index: 6;
         }
         .cat-paw.front {
-            right: 8px;
-            top: 94px;
+            right: 2px;
+            top: 90px;
+            z-index: 10;
         }
         .cat-paw.back {
-            left: 42px;
-            top: 101px;
+            left: 30px;
+            top: 98px;
             transition: transform 0.25s ease;
+            z-index: 10;
         }
         .archery-bow.is-drawn .cat-paw.back {
-            transform: translateX(-24px);
+            transform: translateX(-25px);
         }
         .cat-foot {
             position: absolute;
@@ -3342,13 +3352,13 @@ function ensureArcheryLotteryStyles() {
             left: 31px;
         }
         .archery-mascot-dog {
-            left: 43%;
-            bottom: 0;
-            width: 98px;
-            height: 74px;
+            left: 20%;
+            bottom: 1%;
+            width: 112px;
+            height: 78px;
             animation: dogBob 3.2s ease-in-out infinite;
             transform-origin: 50% 100%;
-            z-index: 8;
+            z-index: 4;
         }
         .dog-body {
             position: absolute;
@@ -3811,34 +3821,39 @@ function ensureArcheryLotteryStyles() {
                 height: 190px;
             }
             .archery-bow-string {
-                top: 16%;
-                bottom: 18%;
-                right: 16%;
+                top: 18%;
+                bottom: 29%;
+                left: 71%;
             }
             .archery-bow.is-drawn .archery-bow-string {
                 transform: translateX(-18px);
             }
             .archery-mascot-cat {
-                left: 5%;
-                bottom: 13%;
+                left: 8%;
+                bottom: 27%;
                 width: 82px;
                 height: 124px;
-                scale: 0.58;
+                scale: 0.62;
                 transform-origin: left bottom;
             }
             .archery-mascot-dog {
-                display: none;
+                display: block;
+                left: 12%;
+                bottom: 5%;
+                width: 70px;
+                height: 48px;
+                scale: 0.72;
             }
             .archery-bow-arc {
-                right: 6%;
-                top: 17%;
+                left: 58%;
+                top: 18%;
                 width: 36px;
-                height: 64%;
+                height: 55%;
                 border-right-width: 6px;
             }
             .archery-bow-grip {
-                right: 9%;
-                top: 42%;
+                left: 64%;
+                top: 36%;
                 width: 12px;
                 height: 32px;
             }
