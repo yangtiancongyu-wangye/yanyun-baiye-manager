@@ -43,7 +43,7 @@ function scheduleSyncStatusCheck() {
             const response = await fetch('/api/sync-status');
             const status = await response.json();
             if (status.lastError && status.pending) {
-                alert(`数据已暂存到当前服务，但远端同步失败，刷新或部署可能丢失：${status.lastError}`);
+                console.warn('远端同步暂时失败，系统会在后台自动重试。', status.lastError);
             }
         } catch (error) {
             console.error('检查数据同步状态失败:', error);

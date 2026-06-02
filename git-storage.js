@@ -55,6 +55,25 @@ async function commitData(message = '自动保存数据') {
 }
 
 async function commitDataWithGitHubApi(message, config) {
+    const maxAttempts = 4;
+    let lastError = null;
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        const result = await commitDataWithGitHubApiOnce(message, config);
+        if (result.success) return result;
+
+        lastError = result.error;
+        if (!result.retryable || attempt >= maxAttempts) break;
+
+        const delay = 250 * attempt;
+        console.warn(`GitHub API 同步遇到远端并发更新，${delay}ms 后重试第 ${attempt + 1} 次`);
+        await sleep(delay);
+    }
+
+    return { success: false, error: lastError || 'GitHub API 同步失败' };
+}
+
+async function commitDataWithGitHubApiOnce(message, config) {
     try {
         const changedFiles = [];
 
@@ -87,7 +106,7 @@ async function commitDataWithGitHubApi(message, config) {
     } catch (error) {
         const detail = error.response?.data?.message || error.message;
         console.error('GitHub API 自动保存失败:', detail);
-        return { success: false, error: detail };
+        return { success: false, error: detail, retryable: isGitHubRetryableConflict(error) };
     }
 }
 
@@ -130,6 +149,18 @@ function normalizeJson(content) {
     } catch (e) {
         return content.trim();
     }
+}
+
+function isGitHubRetryableConflict(error) {
+    const status = error.response?.status;
+    const message = error.response?.data?.message || error.message || '';
+    return status === 409 ||
+        (status === 422 && /is at [0-9a-f]{40} but expected [0-9a-f]{40}/i.test(message)) ||
+        /is at [0-9a-f]{40} but expected [0-9a-f]{40}/i.test(message);
+}
+
+function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 function encodeURIComponentPath(file) {
