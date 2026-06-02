@@ -404,6 +404,7 @@
       "独孤少擎"
     ],
     "createTime": "2026-03-13T06:51:28.498Z",
-    "winners": null
+    "winners": null,
+    "excludedPlayerIds": []
   }
 ]
