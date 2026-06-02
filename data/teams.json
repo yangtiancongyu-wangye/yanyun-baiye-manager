@@ -5,8 +5,7 @@
         {
           "id": "飞天大蟑螂",
           "professions": [
-            "肉陌",
-            "控制陌"
+            "尘"
           ],
           "startPlan": "压下路转中路",
           "followPlan": "跟红车"
@@ -141,8 +140,7 @@
         {
           "id": "飞天大蟑螂",
           "professions": [
-            "肉陌",
-            "控制陌"
+            "尘"
           ],
           "startPlan": "压下路转中路",
           "followPlan": "跟红车/护送红车"
