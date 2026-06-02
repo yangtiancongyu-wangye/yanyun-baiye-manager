@@ -2,6 +2,36 @@
 const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+const axios = require('axios');
+
+const DATA_FILES = ['data/players.json', 'data/teams.json', 'data/lotteries.json'];
+const DEFAULT_REPOSITORY = 'yangtiancongyu-wangye/yanyun-baiye-manager';
+
+function getRepositoryConfig() {
+    let repository = process.env.GITHUB_REPOSITORY || process.env.GH_REPOSITORY || '';
+    if (!repository) {
+        try {
+            const remote = execSync('git config --get remote.origin.url', { encoding: 'utf8' }).trim();
+            const match = remote.match(/github\.com[:/](.+?)(?:\.git)?$/);
+            if (match) repository = match[1];
+        } catch (e) {}
+    }
+
+    return {
+        repository: repository || DEFAULT_REPOSITORY,
+        branch: process.env.GITHUB_BRANCH || 'main',
+        token: process.env.GITHUB_TOKEN || process.env.GH_TOKEN || ''
+    };
+}
+
+function getGitHubHeaders(token) {
+    return {
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/vnd.github+json',
+        'X-GitHub-Api-Version': '2022-11-28',
+        'User-Agent': 'yanyun-baiye-manager'
+    };
+}
 
 // 配置 Git 用户信息（如果未配置）
 function ensureGitConfig() {
@@ -15,6 +45,98 @@ function ensureGitConfig() {
 
 // 提交数据到 GitHub
 async function commitData(message = '自动保存数据') {
+    const config = getRepositoryConfig();
+    if (config.token) {
+        return commitDataWithGitHubApi(message, config);
+    }
+
+    console.warn('未配置 GITHUB_TOKEN，回退到 git push 同步；线上环境可能因为没有 Git 凭据而失败');
+    return commitDataWithGitCli(message);
+}
+
+async function commitDataWithGitHubApi(message, config) {
+    try {
+        const changedFiles = [];
+
+        for (const file of DATA_FILES) {
+            if (!fs.existsSync(file)) continue;
+
+            const localContent = fs.readFileSync(file, 'utf8');
+            const remote = await getRemoteFile(file, config);
+            const remoteContent = remote?.content || '';
+
+            if (normalizeJson(localContent) === normalizeJson(remoteContent)) {
+                continue;
+            }
+
+            changedFiles.push({ file, content: localContent, sha: remote?.sha || null });
+        }
+
+        if (changedFiles.length === 0) {
+            console.log('数据无变化，跳过提交');
+            return { success: true, message: '无需提交' };
+        }
+
+        const timestamp = new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' });
+        for (const item of changedFiles) {
+            await putRemoteFile(item.file, item.content, item.sha, `${message} - ${timestamp}`, config);
+        }
+
+        console.log(`✓ 数据已通过 GitHub API 保存: ${changedFiles.map(item => item.file).join(', ')}`);
+        return { success: true, message: '数据已保存' };
+    } catch (error) {
+        const detail = error.response?.data?.message || error.message;
+        console.error('GitHub API 自动保存失败:', detail);
+        return { success: false, error: detail };
+    }
+}
+
+async function getRemoteFile(file, config) {
+    const url = `https://api.github.com/repos/${config.repository}/contents/${encodeURIComponentPath(file)}`;
+    try {
+        const response = await axios.get(url, {
+            headers: getGitHubHeaders(config.token),
+            params: { ref: config.branch },
+            timeout: 15000
+        });
+        return {
+            sha: response.data.sha,
+            content: Buffer.from(response.data.content || '', 'base64').toString('utf8')
+        };
+    } catch (error) {
+        if (error.response?.status === 404) return null;
+        throw error;
+    }
+}
+
+async function putRemoteFile(file, content, sha, message, config) {
+    const url = `https://api.github.com/repos/${config.repository}/contents/${encodeURIComponentPath(file)}`;
+    const body = {
+        message,
+        content: Buffer.from(content, 'utf8').toString('base64'),
+        branch: config.branch
+    };
+    if (sha) body.sha = sha;
+
+    await axios.put(url, body, {
+        headers: getGitHubHeaders(config.token),
+        timeout: 20000
+    });
+}
+
+function normalizeJson(content) {
+    try {
+        return JSON.stringify(JSON.parse(content));
+    } catch (e) {
+        return content.trim();
+    }
+}
+
+function encodeURIComponentPath(file) {
+    return file.split('/').map(part => encodeURIComponent(part)).join('/');
+}
+
+async function commitDataWithGitCli(message = '自动保存数据') {
     try {
         ensureGitConfig();
 
@@ -52,10 +174,53 @@ async function commitData(message = '自动保存数据') {
 
 // 从 GitHub 拉取最新数据
 async function pullData() {
+    const config = getRepositoryConfig();
+    if (config.token) {
+        return pullDataWithGitHubApi(config);
+    }
+
+    console.warn('未配置 GITHUB_TOKEN，启动时回退到 git pull 加载数据');
+    return pullDataWithGitCli();
+}
+
+async function pullDataWithGitHubApi(config) {
+    try {
+        const localDataStatus = getLocalDataStatus();
+        if (localDataStatus.trim()) {
+            console.warn('检测到本地数据尚未提交，跳过启动拉取，避免覆盖运行中数据');
+            debouncedCommit('保存启动前本地数据', 0);
+            return { success: true, skipped: true };
+        }
+
+        for (const file of DATA_FILES) {
+            const remote = await getRemoteFile(file, config);
+            if (!remote) continue;
+            fs.mkdirSync(path.dirname(file), { recursive: true });
+            fs.writeFileSync(file, remote.content);
+        }
+
+        console.log('✓ 已通过 GitHub API 加载最新数据');
+        return { success: true };
+    } catch (error) {
+        const detail = error.response?.data?.message || error.message;
+        console.error('GitHub API 拉取数据失败:', detail);
+        return { success: false, error: detail };
+    }
+}
+
+function getLocalDataStatus() {
+    try {
+        return execSync('git status --porcelain data/', { encoding: 'utf8' });
+    } catch (e) {
+        return '';
+    }
+}
+
+async function pullDataWithGitCli() {
     try {
         ensureGitConfig();
 
-        const localDataStatus = execSync('git status --porcelain data/', { encoding: 'utf8' });
+        const localDataStatus = getLocalDataStatus();
         if (localDataStatus.trim()) {
             console.warn('检测到本地数据尚未提交，跳过启动拉取，避免覆盖运行中数据');
             debouncedCommit('保存启动前本地数据', 0);
@@ -110,9 +275,14 @@ async function runReliableCommit(message) {
     if (result.success) {
         pendingMessage = null;
         retryAttempts = 0;
+        if (retryTimer) {
+            clearTimeout(retryTimer);
+            retryTimer = null;
+        }
         syncStatus.pending = false;
         syncStatus.retryAttempts = 0;
         syncStatus.lastSuccessAt = new Date().toISOString();
+        syncStatus.lastErrorAt = null;
         syncStatus.lastError = null;
         return;
     }
@@ -130,8 +300,12 @@ async function runReliableCommit(message) {
 }
 
 function getSyncStatus() {
+    const config = getRepositoryConfig();
     return {
         ...syncStatus,
+        storageMode: config.token ? 'github-api' : 'git-cli',
+        repository: config.repository,
+        branch: config.branch,
         hasScheduledCommit: Boolean(commitTimer),
         hasScheduledRetry: Boolean(retryTimer)
     };
