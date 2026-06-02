@@ -2115,8 +2115,10 @@ function renderArcheryEggLotteryAnimation(container, allPlayers, winners, prizes
     const eggMap = new Map();
     const cyclingEggs = [];
     let cycleTimer = null;
-    let cycleIndex = 0;
-    const displayQueue = buildPlayerDisplayQueue(allPlayers);
+    let cycleEggIndex = 0;
+    let cyclePlayerIndex = 0;
+    const shownPlayerIds = new Set();
+    const uniquePlayerIds = Array.from(new Set(allPlayers));
 
     visiblePlayers.forEach((playerId, index) => {
         const egg = document.createElement('div');
@@ -2135,19 +2137,21 @@ function renderArcheryEggLotteryAnimation(container, allPlayers, winners, prizes
         egg.appendChild(name);
 
         eggsArea.appendChild(egg);
+        markPlayerShown(playerId);
         if (winners.includes(playerId) && !eggMap.has(playerId)) {
             eggMap.set(playerId, egg);
         } else {
-            cyclingEggs.push({ egg, name });
+            cyclingEggs.push({ egg, name, slotIndex: index });
         }
     });
 
+    const displayQueue = buildPlayerDisplayQueue(allPlayers, shownPlayerIds);
     startEggNameCycling();
     requestAnimationFrame(() => runArrowSequence(0));
 
     function runArrowSequence(winnerIndex) {
         if (winnerIndex >= winners.length) {
-            showFinalResults();
+            waitForAllPlayersShownThenShowFinal();
             return;
         }
 
@@ -2176,7 +2180,7 @@ function renderArcheryEggLotteryAnimation(container, allPlayers, winners, prizes
             eggsArea.querySelectorAll('.archery-egg.is-aimed').forEach(egg => egg.classList.remove('is-aimed'));
             if (aimedEgg) aimedEgg.classList.add('is-aimed');
             sweepIndex++;
-        }, 95);
+        }, 145);
 
         setTimeout(() => {
             clearInterval(sweepTimer);
@@ -2195,6 +2199,21 @@ function renderArcheryEggLotteryAnimation(container, allPlayers, winners, prizes
                 }, 1050);
             });
         }, 1900 + winnerIndex * 250);
+    }
+
+    function waitForAllPlayersShownThenShowFinal() {
+        if (allPlayersShown() || cyclingEggs.length === 0) {
+            showFinalResults();
+            return;
+        }
+
+        subtitle.textContent = '中奖结果已确认，奖池名单继续滚动';
+        const waitTimer = setInterval(() => {
+            if (!allPlayersShown() && cyclingEggs.length > 0) return;
+
+            clearInterval(waitTimer);
+            showFinalResults();
+        }, 180);
     }
 
     function shootArrowAt(targetEgg, done) {
@@ -2367,11 +2386,15 @@ function renderArcheryEggLotteryAnimation(container, allPlayers, winners, prizes
 
     function buildVisibleLotteryPlayers(players, selectedWinners) {
         const uniquePlayers = Array.from(new Set(players));
+        if (uniquePlayers.length === 0 && selectedWinners.length === 0) return [];
+
         const winnerSet = new Set(selectedWinners);
         const nonWinners = uniquePlayers.filter(player => !winnerSet.has(player)).sort(() => Math.random() - 0.5);
         const viewportWidth = window.innerWidth || document.documentElement.clientWidth || 1200;
-        const maxVisible = Math.max(selectedWinners.length, Math.min(viewportWidth <= 760 ? 12 : 24, uniquePlayers.length));
+        const baseVisible = viewportWidth <= 760 ? 12 : 24;
+        const maxVisible = Math.max(selectedWinners.length, baseVisible);
         const visible = new Array(maxVisible).fill(null);
+        const availablePlayers = uniquePlayers.length > 0 ? uniquePlayers : selectedWinners;
         selectedWinners.forEach((winner, index) => {
             const slot = Math.min(maxVisible - 1, Math.round(((index + 1) * maxVisible) / (selectedWinners.length + 1)));
             let targetSlot = slot;
@@ -2380,42 +2403,63 @@ function renderArcheryEggLotteryAnimation(container, allPlayers, winners, prizes
             visible[targetSlot] = winner;
         });
 
+        const firstPassPlayers = nonWinners.filter(player => !visible.includes(player));
+        let firstPassIndex = 0;
+        for (let i = 0; i < visible.length; i++) {
+            if (visible[i] || firstPassIndex >= firstPassPlayers.length) continue;
+
+            visible[i] = firstPassPlayers[firstPassIndex];
+            firstPassIndex++;
+        }
+
         let fillerIndex = 0;
         for (let i = 0; i < visible.length; i++) {
-            if (!visible[i]) {
-                visible[i] = nonWinners[fillerIndex % Math.max(1, nonWinners.length)] || selectedWinners[i % selectedWinners.length];
-                fillerIndex++;
-            }
+            if (visible[i]) continue;
+
+            visible[i] = pickNonAdjacentPlayer(availablePlayers, visible, i, fillerIndex);
+            fillerIndex++;
+        }
+
+        for (let i = 1; i < visible.length; i++) {
+            if (visible[i] !== visible[i - 1]) continue;
+
+            visible[i] = pickNonAdjacentPlayer(availablePlayers, visible, i, fillerIndex);
+            fillerIndex++;
         }
 
         return visible;
     }
 
-    function buildPlayerDisplayQueue(players) {
+    function buildPlayerDisplayQueue(players, shownPlayers = new Set()) {
         const uniquePlayers = Array.from(new Set(players));
         if (uniquePlayers.length === 0) return [''];
-        return [...uniquePlayers].sort(() => Math.random() - 0.5);
+
+        const unseenPlayers = uniquePlayers.filter(player => !shownPlayers.has(player)).sort(() => Math.random() - 0.5);
+        const cycledPlayers = [...uniquePlayers].sort(() => Math.random() - 0.5);
+        return [...unseenPlayers, ...cycledPlayers];
     }
 
     function startEggNameCycling() {
         if (cyclingEggs.length === 0 || displayQueue.length === 0) return;
 
         cycleTimer = setInterval(() => {
-            const updatesPerTick = Math.max(1, Math.ceil(cyclingEggs.length / 3));
+            const updatesPerTick = Math.max(1, Math.ceil(cyclingEggs.length / 8));
             for (let i = 0; i < updatesPerTick; i++) {
-                const item = cyclingEggs[(cycleIndex + i) % cyclingEggs.length];
-                const playerId = displayQueue[(cycleIndex + i) % displayQueue.length];
+                const item = cyclingEggs[(cycleEggIndex + i) % cyclingEggs.length];
                 if (!item || item.egg.classList.contains('is-winner')) continue;
+
+                const playerId = getNextDisplayPlayer(item.slotIndex);
 
                 item.egg.dataset.playerId = playerId;
                 item.name.textContent = playerId;
                 item.name.style.fontSize = getEggNameFontSize(playerId);
+                markPlayerShown(playerId);
                 item.egg.classList.remove('is-name-flip');
                 void item.egg.offsetWidth;
                 item.egg.classList.add('is-name-flip');
             }
-            cycleIndex = (cycleIndex + updatesPerTick) % Math.max(1, displayQueue.length);
-        }, 180);
+            cycleEggIndex = (cycleEggIndex + updatesPerTick) % cyclingEggs.length;
+        }, 620);
     }
 
     function stopEggNameCycling() {
@@ -2423,6 +2467,67 @@ function renderArcheryEggLotteryAnimation(container, allPlayers, winners, prizes
             clearInterval(cycleTimer);
             cycleTimer = null;
         }
+    }
+
+    function getNextDisplayPlayer(slotIndex) {
+        if (displayQueue.length <= 1) {
+            return displayQueue[0] || '';
+        }
+
+        const neighborNames = getNeighborNames(slotIndex);
+        for (let attempt = 0; attempt < displayQueue.length; attempt++) {
+            const playerId = displayQueue[cyclePlayerIndex % displayQueue.length];
+            cyclePlayerIndex++;
+            if (!neighborNames.has(playerId)) {
+                return playerId;
+            }
+        }
+
+        const fallback = displayQueue[cyclePlayerIndex % displayQueue.length];
+        cyclePlayerIndex++;
+        return fallback;
+    }
+
+    function getNeighborNames(slotIndex) {
+        const names = new Set();
+        const previousEgg = eggsArea.children[slotIndex - 1];
+        const nextEgg = eggsArea.children[slotIndex + 1];
+
+        if (previousEgg?.dataset.playerId) names.add(previousEgg.dataset.playerId);
+        if (nextEgg?.dataset.playerId) names.add(nextEgg.dataset.playerId);
+
+        return names;
+    }
+
+    function pickNonAdjacentPlayer(players, visible, index, seed = 0) {
+        const candidates = players.filter(player => player);
+        if (candidates.length === 0) return '';
+        if (candidates.length === 1) return candidates[0];
+
+        const left = visible[index - 1];
+        const right = visible[index + 1];
+        const nextFixed = !right ? visible[index + 2] : null;
+
+        for (let i = 0; i < candidates.length; i++) {
+            const candidate = candidates[(seed + i) % candidates.length];
+            const canFillNextSlot = !nextFixed || candidates.some(nextCandidate =>
+                nextCandidate !== candidate && nextCandidate !== nextFixed
+            );
+            if (candidate !== left && candidate !== right) {
+                if (!canFillNextSlot) continue;
+                return candidate;
+            }
+        }
+
+        return candidates[seed % candidates.length];
+    }
+
+    function markPlayerShown(playerId) {
+        if (playerId) shownPlayerIds.add(playerId);
+    }
+
+    function allPlayersShown() {
+        return uniquePlayerIds.every(playerId => shownPlayerIds.has(playerId));
     }
 
     function getEggNameFontSize(name) {
@@ -2865,7 +2970,7 @@ function ensureArcheryLotteryStyles() {
             transform: translateY(0) scale(1.06);
         }
         .archery-egg.is-name-flip {
-            animation: eggNameFlip 0.18s ease-out;
+            animation: eggNameFlip 0.34s ease-out;
         }
         .archery-egg.is-hit {
             animation: eggHit 0.5s ease forwards;
