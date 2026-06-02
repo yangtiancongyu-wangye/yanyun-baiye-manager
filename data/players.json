@@ -379,5 +379,13 @@
     ],
     "notes": "",
     "uid": "uc8joxks3a"
+  },
+  {
+    "id": "普通员工",
+    "professions": [
+      "陌刀"
+    ],
+    "notes": "测试",
+    "uid": "u9dxqlpa7y"
   }
 ]
