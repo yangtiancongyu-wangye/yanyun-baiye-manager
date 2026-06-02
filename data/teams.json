@@ -396,30 +396,6 @@
       [],
       []
     ],
-    "availablePlayers": [
-      {
-        "id": "风千杨",
-        "professions": [
-          "十方陌",
-          "陌刀"
-        ],
-        "uid": "u908vfhgqn"
-      },
-      {
-        "id": "常伴明月",
-        "professions": [
-          "陌奶",
-          "陌刀风扇"
-        ],
-        "uid": "urusanww3o"
-      },
-      {
-        "id": "攸风",
-        "professions": [
-          "无名"
-        ],
-        "uid": "ucif6sn38j"
-      }
-    ]
+    "availablePlayers": []
   }
 }
