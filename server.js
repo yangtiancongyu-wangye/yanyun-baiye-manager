@@ -7,7 +7,7 @@ const fs = require('fs');
 const sharp = require('sharp');
 const Tesseract = require('tesseract.js');
 const { initializeData } = require('./init-data');
-const { pullData, debouncedCommit } = require('./git-storage');
+const { pullData, debouncedCommit, commitData } = require('./git-storage');
 
 function generateUid() {
     return 'u' + Math.random().toString(36).substring(2, 11);
@@ -1032,7 +1032,7 @@ app.get('/api/lotteries', (req, res) => {
 });
 
 // 保存抽奖数据
-app.post('/api/lotteries', (req, res) => {
+app.post('/api/lotteries', async (req, res) => {
     try {
         const existingLotteries = fs.existsSync(LOTTERIES_FILE)
             ? JSON.parse(fs.readFileSync(LOTTERIES_FILE, 'utf8'))
@@ -1041,8 +1041,11 @@ app.post('/api/lotteries', (req, res) => {
         const lotteries = mergeLotteryHistory(existingLotteries, incomingLotteries);
         fs.writeFileSync(LOTTERIES_FILE, JSON.stringify(lotteries, null, 2));
 
-        // 自动提交到 GitHub（5秒防抖）
-        debouncedCommit('更新抽奖数据');
+        // 抽奖结果必须确认远端持久化后再告诉前端保存成功。
+        const commitResult = await commitData('更新抽奖数据');
+        if (!commitResult.success) {
+            throw new Error(commitResult.error || '抽奖数据远端保存失败');
+        }
 
         res.json({ success: true });
     } catch (error) {
