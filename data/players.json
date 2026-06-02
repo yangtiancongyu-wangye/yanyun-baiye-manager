@@ -320,14 +320,6 @@
     "uid": "uc8joxks3a"
   },
   {
-    "id": "普通员工",
-    "professions": [
-      "陌刀"
-    ],
-    "notes": "测试",
-    "uid": "u9dxqlpa7y"
-  },
-  {
     "id": "半夏寺下",
     "professions": [
       "双扇"
@@ -462,29 +454,5 @@
     ],
     "notes": "",
     "uid": "ujqag3nppy"
-  },
-  {
-    "id": "少亓一",
-    "professions": [
-      "纯奶"
-    ],
-    "notes": "",
-    "uid": "ucbddgb42d"
-  },
-  {
-    "id": "冷香寻",
-    "professions": [
-      "纯奶"
-    ],
-    "notes": "",
-    "uid": "u08p6abi7j"
-  },
-  {
-    "id": "晏极",
-    "professions": [
-      "无名"
-    ],
-    "notes": "",
-    "uid": "uciokscnku"
   }
 ]
