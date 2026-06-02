@@ -1918,22 +1918,26 @@ async function deleteLottery(index) {
 }
 
 // 执行抽奖
-function drawLottery(index) {
+async function drawLottery(index) {
     const lottery = lotteries[index];
 
     if (confirm(`确定要为"${lottery.name}"进行抽奖吗？抽奖后将无法修改。`)) {
         // 计算中奖玩家（考虑历史中奖记录）
         const winners = calculateWinnersWithHistory(lottery.playerIds, lottery.winnerCount);
+        const previousWinners = lottery.winners;
+
+        // 先保存中奖结果，再播放动画，避免页面刷新或动画中断导致历史记录丢失。
+        lottery.winners = winners;
+        const saved = await saveLotteries();
+        if (!saved) {
+            lottery.winners = previousWinners;
+            return;
+        }
+        renderLotteryTable();
 
         // 显示抽奖动画
         showLotteryAnimation(lottery.playerIds, winners, lottery.prizes, () => {
-            // 动画结束后保存结果
-            lottery.winners = winners;
-            saveLotteries().then(saved => {
-                if (saved) {
-                    renderLotteryTable();
-                }
-            });
+            renderLotteryTable();
         });
     }
 }
@@ -2032,11 +2036,655 @@ function calculateWinnersWithHistory(playerIds, winnerCount) {
     return winners;
 }
 
+function renderArcheryEggLotteryAnimation(container, allPlayers, winners, prizes, onComplete) {
+    ensureArcheryLotteryStyles();
+
+    const stage = document.createElement('div');
+    stage.className = 'archery-lottery-stage';
+    container.appendChild(stage);
+
+    const header = document.createElement('div');
+    header.className = 'archery-lottery-header';
+    stage.appendChild(header);
+
+    const title = document.createElement('div');
+    title.className = 'archery-lottery-title';
+    title.textContent = '百业飞羽定魁';
+    header.appendChild(title);
+
+    const subtitle = document.createElement('div');
+    subtitle.className = 'archery-lottery-subtitle';
+    subtitle.textContent = '箭过群名，落处即为本轮中奖玩家';
+    header.appendChild(subtitle);
+
+    const field = document.createElement('div');
+    field.className = 'archery-lottery-field';
+    stage.appendChild(field);
+
+    const bow = document.createElement('div');
+    bow.className = 'archery-bow';
+    bow.innerHTML = '<div class="archery-bow-string"></div><div class="archery-bow-arc"></div>';
+    field.appendChild(bow);
+
+    const arrow = document.createElement('div');
+    arrow.className = 'archery-arrow';
+    arrow.innerHTML = '<span class="archery-arrow-head"></span><span class="archery-arrow-shaft"></span><span class="archery-arrow-fletching"></span>';
+    field.appendChild(arrow);
+
+    const eggsArea = document.createElement('div');
+    eggsArea.className = 'archery-eggs-area';
+    field.appendChild(eggsArea);
+
+    const resultPanel = document.createElement('div');
+    resultPanel.className = 'archery-result-panel';
+    field.appendChild(resultPanel);
+
+    const visiblePlayers = buildVisibleLotteryPlayers(allPlayers, winners);
+    const eggMap = new Map();
+
+    visiblePlayers.forEach((playerId, index) => {
+        const egg = document.createElement('div');
+        egg.className = 'archery-egg';
+        egg.dataset.playerId = playerId;
+        egg.style.setProperty('--egg-delay', `${(index % 12) * 0.04}s`);
+
+        const shine = document.createElement('div');
+        shine.className = 'archery-egg-shine';
+        egg.appendChild(shine);
+
+        const name = document.createElement('div');
+        name.className = 'archery-egg-name';
+        name.textContent = playerId;
+        name.style.fontSize = getEggNameFontSize(playerId);
+        egg.appendChild(name);
+
+        eggsArea.appendChild(egg);
+        if (!eggMap.has(playerId)) {
+            eggMap.set(playerId, egg);
+        }
+    });
+
+    requestAnimationFrame(() => runArrowSequence(0));
+
+    function runArrowSequence(winnerIndex) {
+        if (winnerIndex >= winners.length) {
+            showFinalResults();
+            return;
+        }
+
+        const winner = winners[winnerIndex];
+        const prizeName = prizes[winnerIndex] || `奖品${winnerIndex + 1}`;
+        const targetEgg = eggMap.get(winner);
+
+        title.textContent = prizeName;
+        subtitle.textContent = `第 ${winnerIndex + 1} 箭正在寻找目标`;
+
+        if (!targetEgg) {
+            runArrowSequence(winnerIndex + 1);
+            return;
+        }
+
+        resetArrow();
+        eggsArea.querySelectorAll('.archery-egg').forEach(egg => {
+            egg.classList.remove('is-aimed');
+        });
+
+        const sweepList = buildSweepList(visiblePlayers, winner);
+        let sweepIndex = 0;
+
+        const sweepTimer = setInterval(() => {
+            const aimedPlayer = sweepList[sweepIndex % sweepList.length];
+            const aimedEgg = eggMap.get(aimedPlayer);
+            eggsArea.querySelectorAll('.archery-egg.is-aimed').forEach(egg => egg.classList.remove('is-aimed'));
+            if (aimedEgg) aimedEgg.classList.add('is-aimed');
+            sweepIndex++;
+        }, 95);
+
+        setTimeout(() => {
+            clearInterval(sweepTimer);
+            eggsArea.querySelectorAll('.archery-egg.is-aimed').forEach(egg => egg.classList.remove('is-aimed'));
+            targetEgg.classList.add('is-aimed');
+            shootArrowAt(targetEgg, () => {
+                targetEgg.classList.remove('is-aimed');
+                targetEgg.classList.add('is-hit', 'is-winner');
+                createImpactBurst(targetEgg);
+                addResultChip(prizeName, winner);
+                subtitle.textContent = `射中 ${winner}`;
+
+                setTimeout(() => {
+                    runArrowSequence(winnerIndex + 1);
+                }, 1050);
+            });
+        }, 1900 + winnerIndex * 250);
+    }
+
+    function shootArrowAt(targetEgg, done) {
+        const fieldRect = field.getBoundingClientRect();
+        const eggRect = targetEgg.getBoundingClientRect();
+        const targetX = eggRect.left - fieldRect.left + eggRect.width * 0.46;
+        const targetY = eggRect.top - fieldRect.top + eggRect.height * 0.5;
+        const startX = Math.max(34, fieldRect.width * 0.08);
+        const startY = targetY + 18;
+        const distanceX = targetX - startX;
+        const distanceY = targetY - startY;
+        const angle = Math.atan2(distanceY, distanceX) * 180 / Math.PI;
+
+        arrow.style.transition = 'none';
+        arrow.style.opacity = '1';
+        arrow.style.left = `${startX}px`;
+        arrow.style.top = `${startY}px`;
+        arrow.style.transform = `translate(-35%, -50%) rotate(${angle}deg)`;
+        bow.classList.add('is-drawn');
+
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                bow.classList.remove('is-drawn');
+                arrow.style.transition = 'left 1.15s cubic-bezier(0.16, 0.84, 0.22, 1), top 1.15s cubic-bezier(0.16, 0.84, 0.22, 1), transform 1.15s cubic-bezier(0.16, 0.84, 0.22, 1)';
+                arrow.style.left = `${targetX}px`;
+                arrow.style.top = `${targetY}px`;
+                arrow.style.transform = `translate(-72%, -50%) rotate(${angle}deg)`;
+            });
+        });
+
+        setTimeout(done, 1160);
+    }
+
+    function resetArrow() {
+        arrow.style.transition = 'none';
+        arrow.style.opacity = '0';
+        arrow.style.left = '7%';
+        arrow.style.top = '50%';
+        arrow.style.transform = 'translate(-35%, -50%) rotate(0deg)';
+    }
+
+    function addResultChip(prizeName, winner) {
+        const chip = document.createElement('div');
+        chip.className = 'archery-result-chip';
+
+        const prize = document.createElement('span');
+        prize.className = 'archery-result-prize';
+        prize.textContent = prizeName;
+        chip.appendChild(prize);
+
+        const name = document.createElement('strong');
+        name.textContent = winner;
+        chip.appendChild(name);
+
+        resultPanel.appendChild(chip);
+    }
+
+    function showFinalResults() {
+        title.textContent = '中奖名单';
+        subtitle.textContent = '飞羽已定，恭喜以下玩家';
+        arrow.style.opacity = '0';
+        field.classList.add('showing-final');
+
+        const finalList = document.createElement('div');
+        finalList.className = 'archery-final-list';
+
+        winners.forEach((winner, index) => {
+            const card = document.createElement('div');
+            card.className = 'archery-final-card';
+            card.style.setProperty('--final-delay', `${index * 0.12}s`);
+
+            const prize = document.createElement('span');
+            prize.textContent = prizes[index] || `奖品${index + 1}`;
+            card.appendChild(prize);
+
+            const name = document.createElement('strong');
+            name.textContent = winner;
+            card.appendChild(name);
+
+            finalList.appendChild(card);
+        });
+
+        field.appendChild(finalList);
+
+        setTimeout(() => {
+            container.style.display = 'none';
+            container.innerHTML = '';
+            onComplete();
+        }, 4600);
+    }
+
+    function createImpactBurst(targetEgg) {
+        const fieldRect = field.getBoundingClientRect();
+        const eggRect = targetEgg.getBoundingClientRect();
+        const burst = document.createElement('div');
+        burst.className = 'archery-impact-burst';
+        burst.style.left = `${eggRect.left - fieldRect.left + eggRect.width / 2}px`;
+        burst.style.top = `${eggRect.top - fieldRect.top + eggRect.height / 2}px`;
+        field.appendChild(burst);
+
+        for (let i = 0; i < 18; i++) {
+            const spark = document.createElement('span');
+            const angle = (Math.PI * 2 * i) / 18;
+            const distance = 54 + Math.random() * 56;
+            spark.style.setProperty('--spark-x', `${Math.cos(angle) * distance}px`);
+            spark.style.setProperty('--spark-y', `${Math.sin(angle) * distance}px`);
+            spark.style.animationDelay = `${Math.random() * 0.08}s`;
+            burst.appendChild(spark);
+        }
+
+        setTimeout(() => burst.remove(), 950);
+    }
+
+    function buildSweepList(players, winner) {
+        const shuffled = [...players].sort(() => Math.random() - 0.5);
+        const withoutWinner = shuffled.filter(player => player !== winner);
+        return [...withoutWinner.slice(0, 20), winner];
+    }
+
+    function buildVisibleLotteryPlayers(players, selectedWinners) {
+        const uniquePlayers = Array.from(new Set(players));
+        const winnerSet = new Set(selectedWinners);
+        const nonWinners = uniquePlayers.filter(player => !winnerSet.has(player)).sort(() => Math.random() - 0.5);
+        const maxVisible = Math.max(18, Math.min(36, uniquePlayers.length));
+        const fillerCount = Math.max(0, maxVisible - selectedWinners.length);
+        return [...selectedWinners, ...nonWinners.slice(0, fillerCount)].sort(() => Math.random() - 0.5);
+    }
+
+    function getEggNameFontSize(name) {
+        if (name.length <= 3) return '22px';
+        if (name.length <= 5) return '18px';
+        if (name.length <= 7) return '15px';
+        return '13px';
+    }
+}
+
+function ensureArcheryLotteryStyles() {
+    if (document.getElementById('archery-lottery-styles')) return;
+
+    const style = document.createElement('style');
+    style.id = 'archery-lottery-styles';
+    style.textContent = `
+        @keyframes archeryStageGlow {
+            0%, 100% { opacity: 0.64; transform: translateX(-2%); }
+            50% { opacity: 1; transform: translateX(2%); }
+        }
+        @keyframes eggEnter {
+            from { opacity: 0; transform: translateY(24px) scale(0.86); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        @keyframes eggFloat {
+            0%, 100% { transform: translateY(0) rotate(-1deg); }
+            50% { transform: translateY(-8px) rotate(1deg); }
+        }
+        @keyframes eggAim {
+            0%, 100% { box-shadow: 0 12px 28px rgba(0, 0, 0, 0.28), 0 0 0 0 rgba(213, 70, 54, 0.16); }
+            50% { box-shadow: 0 16px 36px rgba(0, 0, 0, 0.34), 0 0 0 12px rgba(213, 70, 54, 0.26); }
+        }
+        @keyframes eggHit {
+            0% { transform: scale(1) rotate(0); }
+            35% { transform: scale(1.14) rotate(-5deg); }
+            100% { transform: scale(1.05) rotate(2deg); }
+        }
+        @keyframes sparkFly {
+            from { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+            to { opacity: 0; transform: translate(calc(-50% + var(--spark-x)), calc(-50% + var(--spark-y))) scale(0.2); }
+        }
+        @keyframes finalPop {
+            from { opacity: 0; transform: translateY(22px) scale(0.94); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        .archery-lottery-stage {
+            width: 100%;
+            min-height: 100vh;
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 28px 32px 34px;
+            background:
+                linear-gradient(180deg, rgba(17, 24, 39, 0.72), rgba(8, 13, 23, 0.92)),
+                radial-gradient(circle at 22% 22%, rgba(191, 92, 58, 0.24), transparent 30%),
+                radial-gradient(circle at 80% 18%, rgba(60, 139, 138, 0.24), transparent 32%),
+                linear-gradient(140deg, #151c24 0%, #243026 50%, #151820 100%);
+            color: #fff7e6;
+            font-family: 'Microsoft YaHei', 'Segoe UI', sans-serif;
+        }
+        .archery-lottery-stage::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background:
+                repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.045) 0 1px, transparent 1px 100px),
+                linear-gradient(90deg, transparent, rgba(246, 212, 142, 0.12), transparent);
+            animation: archeryStageGlow 5s ease-in-out infinite;
+            pointer-events: none;
+        }
+        .archery-lottery-header {
+            position: relative;
+            z-index: 3;
+            text-align: center;
+            margin-bottom: 22px;
+        }
+        .archery-lottery-title {
+            font-size: clamp(36px, 5.6vw, 78px);
+            font-weight: 900;
+            letter-spacing: 0;
+            text-shadow: 0 5px 24px rgba(0, 0, 0, 0.58), 0 0 30px rgba(246, 212, 142, 0.34);
+        }
+        .archery-lottery-subtitle {
+            margin-top: 10px;
+            font-size: clamp(16px, 2vw, 25px);
+            color: rgba(255, 247, 230, 0.82);
+        }
+        .archery-lottery-field {
+            width: min(1320px, 96vw);
+            height: min(670px, 68vh);
+            min-height: 470px;
+            position: relative;
+            z-index: 2;
+            border: 1px solid rgba(246, 212, 142, 0.28);
+            border-radius: 8px;
+            background:
+                linear-gradient(180deg, rgba(255, 255, 255, 0.08), transparent 34%),
+                linear-gradient(90deg, rgba(50, 31, 23, 0.8) 0 18%, rgba(34, 58, 39, 0.74) 18% 100%);
+            box-shadow: 0 34px 90px rgba(0, 0, 0, 0.42), inset 0 0 80px rgba(0, 0, 0, 0.25);
+            overflow: hidden;
+        }
+        .archery-lottery-field::after {
+            content: '';
+            position: absolute;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            height: 30%;
+            background: linear-gradient(180deg, transparent, rgba(23, 37, 29, 0.72));
+            pointer-events: none;
+        }
+        .archery-bow {
+            position: absolute;
+            left: 3.6%;
+            top: 50%;
+            width: 110px;
+            height: 300px;
+            transform: translateY(-50%);
+            z-index: 8;
+        }
+        .archery-bow-arc {
+            position: absolute;
+            inset: 0 28px 0 0;
+            border-right: 10px solid #c07c42;
+            border-radius: 0 100% 100% 0;
+            filter: drop-shadow(0 0 16px rgba(246, 212, 142, 0.22));
+        }
+        .archery-bow-string {
+            position: absolute;
+            top: 16px;
+            bottom: 16px;
+            right: 30px;
+            width: 2px;
+            background: rgba(255, 247, 230, 0.8);
+            transform-origin: center;
+            transition: transform 0.25s ease;
+        }
+        .archery-bow.is-drawn .archery-bow-string {
+            transform: translateX(-26px);
+        }
+        .archery-arrow {
+            position: absolute;
+            left: 7%;
+            top: 50%;
+            width: 190px;
+            height: 18px;
+            opacity: 0;
+            z-index: 9;
+            pointer-events: none;
+            transform-origin: 72% 50%;
+        }
+        .archery-arrow-shaft {
+            position: absolute;
+            left: 14px;
+            right: 28px;
+            top: 8px;
+            height: 3px;
+            background: linear-gradient(90deg, #f7d68e, #8c4f2c);
+            box-shadow: 0 0 12px rgba(246, 212, 142, 0.45);
+        }
+        .archery-arrow-head {
+            position: absolute;
+            right: 8px;
+            top: 2px;
+            width: 0;
+            height: 0;
+            border-top: 7px solid transparent;
+            border-bottom: 7px solid transparent;
+            border-left: 18px solid #e7e1d3;
+            filter: drop-shadow(0 0 7px rgba(255, 247, 230, 0.62));
+        }
+        .archery-arrow-fletching {
+            position: absolute;
+            left: 0;
+            top: 2px;
+            width: 20px;
+            height: 14px;
+            background: linear-gradient(135deg, #d54636 0 50%, #fff7e6 50% 100%);
+            clip-path: polygon(0 0, 100% 50%, 0 100%, 28% 50%);
+        }
+        .archery-eggs-area {
+            position: absolute;
+            left: 20%;
+            right: 4%;
+            top: 12%;
+            bottom: 15%;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(112px, 1fr));
+            grid-auto-rows: minmax(116px, 1fr);
+            align-items: center;
+            justify-items: center;
+            gap: 14px 16px;
+            z-index: 4;
+        }
+        .archery-egg {
+            width: 104px;
+            height: 132px;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 22px 14px 18px;
+            color: #3c2519;
+            background:
+                radial-gradient(circle at 33% 22%, rgba(255, 255, 255, 0.94), transparent 18%),
+                radial-gradient(circle at 62% 70%, rgba(238, 188, 116, 0.34), transparent 36%),
+                linear-gradient(150deg, #fff7e3 0%, #f1d8a6 74%, #d9a667 100%);
+            border: 2px solid rgba(125, 75, 38, 0.38);
+            border-radius: 52% 48% 50% 50% / 62% 62% 40% 40%;
+            box-shadow: 0 12px 28px rgba(0, 0, 0, 0.28), inset -12px -16px 22px rgba(145, 86, 43, 0.14);
+            opacity: 0;
+            animation: eggEnter 0.48s ease forwards var(--egg-delay), eggFloat 3.8s ease-in-out infinite calc(var(--egg-delay) + 0.5s);
+            transition: filter 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
+        }
+        .archery-egg-name {
+            max-width: 82px;
+            line-height: 1.08;
+            font-weight: 900;
+            text-align: center;
+            overflow-wrap: anywhere;
+            text-shadow: 0 1px 0 rgba(255, 255, 255, 0.52);
+            position: relative;
+            z-index: 2;
+        }
+        .archery-egg-shine {
+            position: absolute;
+            width: 22px;
+            height: 42px;
+            left: 23px;
+            top: 22px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.45);
+            transform: rotate(30deg);
+        }
+        .archery-egg.is-aimed {
+            filter: brightness(1.12);
+            animation: eggAim 0.45s ease-in-out infinite;
+        }
+        .archery-egg.is-hit {
+            animation: eggHit 0.5s ease forwards;
+        }
+        .archery-egg.is-winner {
+            background:
+                radial-gradient(circle at 33% 22%, rgba(255, 255, 255, 0.96), transparent 18%),
+                radial-gradient(circle at 62% 70%, rgba(220, 53, 40, 0.2), transparent 34%),
+                linear-gradient(150deg, #fff0c6 0%, #f5c45f 72%, #d54636 100%);
+            border-color: rgba(255, 247, 230, 0.88);
+            box-shadow: 0 18px 46px rgba(0, 0, 0, 0.42), 0 0 32px rgba(245, 196, 95, 0.48);
+        }
+        .archery-result-panel {
+            position: absolute;
+            left: 24px;
+            bottom: 22px;
+            right: 24px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            z-index: 7;
+        }
+        .archery-result-chip {
+            display: flex;
+            align-items: baseline;
+            gap: 10px;
+            padding: 10px 14px;
+            border: 1px solid rgba(246, 212, 142, 0.4);
+            border-radius: 8px;
+            background: rgba(18, 22, 26, 0.78);
+            color: #fff7e6;
+            box-shadow: 0 12px 24px rgba(0, 0, 0, 0.28);
+        }
+        .archery-result-prize {
+            color: #f5c45f;
+            font-size: 14px;
+        }
+        .archery-result-chip strong {
+            font-size: 20px;
+        }
+        .archery-impact-burst {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            z-index: 10;
+            pointer-events: none;
+        }
+        .archery-impact-burst span {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 9px;
+            height: 9px;
+            border-radius: 50%;
+            background: #fff7e6;
+            box-shadow: 0 0 14px #f5c45f;
+            animation: sparkFly 0.72s ease-out forwards;
+        }
+        .archery-final-list {
+            position: absolute;
+            inset: 0;
+            z-index: 11;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 22px;
+            padding: 56px;
+            background: rgba(9, 13, 20, 0.84);
+            backdrop-filter: blur(4px);
+        }
+        .archery-final-card {
+            min-width: 230px;
+            max-width: 340px;
+            padding: 28px 32px;
+            border: 1px solid rgba(246, 212, 142, 0.66);
+            border-radius: 8px;
+            background: linear-gradient(160deg, rgba(255, 247, 230, 0.16), rgba(20, 31, 30, 0.94));
+            color: #fff7e6;
+            text-align: center;
+            box-shadow: 0 22px 60px rgba(0, 0, 0, 0.45), 0 0 28px rgba(245, 196, 95, 0.22);
+            opacity: 0;
+            animation: finalPop 0.62s ease forwards var(--final-delay);
+        }
+        .archery-final-card span {
+            display: block;
+            margin-bottom: 12px;
+            color: #f5c45f;
+            font-size: clamp(16px, 2vw, 24px);
+            font-weight: 700;
+        }
+        .archery-final-card strong {
+            display: block;
+            font-size: clamp(38px, 5vw, 78px);
+            line-height: 1.05;
+            overflow-wrap: anywhere;
+        }
+        .archery-lottery-field.showing-final .archery-eggs-area,
+        .archery-lottery-field.showing-final .archery-bow,
+        .archery-lottery-field.showing-final .archery-result-panel {
+            opacity: 0.18;
+        }
+        @media (max-width: 760px) {
+            .archery-lottery-stage {
+                padding: 18px 12px;
+                justify-content: flex-start;
+            }
+            .archery-lottery-field {
+                width: 96vw;
+                height: 72vh;
+                min-height: 520px;
+            }
+            .archery-bow {
+                left: -6px;
+                width: 76px;
+                height: 220px;
+            }
+            .archery-eggs-area {
+                left: 18%;
+                right: 2%;
+                top: 8%;
+                bottom: 18%;
+                grid-template-columns: repeat(auto-fit, minmax(82px, 1fr));
+                grid-auto-rows: minmax(96px, 1fr);
+                gap: 10px;
+            }
+            .archery-egg {
+                width: 78px;
+                height: 100px;
+                padding: 16px 9px 12px;
+            }
+            .archery-egg-name {
+                max-width: 64px;
+                font-size: 12px !important;
+            }
+            .archery-arrow {
+                width: 128px;
+            }
+            .archery-result-panel {
+                left: 12px;
+                right: 12px;
+                bottom: 12px;
+            }
+            .archery-final-list {
+                padding: 22px;
+                align-content: center;
+            }
+            .archery-final-card {
+                min-width: min(260px, 86vw);
+                padding: 22px 24px;
+            }
+        }
+    `;
+    document.head.appendChild(style);
+}
+
 // 显示抽奖动画 - 霓虹灯轮盘
 function showLotteryAnimation(allPlayers, winners, prizes, onComplete) {
     const container = document.getElementById('lottery-animation-container');
     container.style.display = 'flex';
     container.innerHTML = '';
+    renderArcheryEggLotteryAnimation(container, allPlayers, winners, prizes, onComplete);
+    return;
 
     const stagePalette = {
         ink: '#07111f',
