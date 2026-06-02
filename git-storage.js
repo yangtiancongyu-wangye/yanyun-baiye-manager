@@ -55,6 +55,13 @@ async function pullData() {
     try {
         ensureGitConfig();
 
+        const localDataStatus = execSync('git status --porcelain data/', { encoding: 'utf8' });
+        if (localDataStatus.trim()) {
+            console.warn('检测到本地数据尚未提交，跳过启动拉取，避免覆盖运行中数据');
+            debouncedCommit('保存启动前本地数据', 0);
+            return { success: true, skipped: true };
+        }
+
         // 拉取最新数据
         execSync('git pull origin main', { timeout: 10000 });
 
@@ -69,24 +76,48 @@ async function pullData() {
 // 防抖函数 - 避免频繁提交
 let commitTimer = null;
 let pendingMessage = null;
+let retryTimer = null;
+let retryAttempts = 0;
 
 function debouncedCommit(message, delay = 1000) {
     pendingMessage = message;
     if (commitTimer) {
         clearTimeout(commitTimer);
     }
+    if (retryTimer) {
+        clearTimeout(retryTimer);
+        retryTimer = null;
+    }
 
     commitTimer = setTimeout(() => {
-        pendingMessage = null;
-        commitData(message);
+        commitTimer = null;
+        runReliableCommit(message);
     }, delay);
+}
+
+async function runReliableCommit(message) {
+    const result = await commitData(message);
+    if (result.success) {
+        pendingMessage = null;
+        retryAttempts = 0;
+        return;
+    }
+
+    retryAttempts++;
+    const retryDelay = Math.min(60000, 5000 * retryAttempts);
+    console.warn(`数据保存到 GitHub 失败，${Math.round(retryDelay / 1000)} 秒后重试第 ${retryAttempts} 次`);
+    retryTimer = setTimeout(() => {
+        runReliableCommit(pendingMessage || message);
+    }, retryDelay);
 }
 
 // 进程退出前立即执行挂起的提交，防止重新部署时数据丢失
 function flushPendingCommit() {
-    if (commitTimer && pendingMessage) {
-        clearTimeout(commitTimer);
+    if ((commitTimer || retryTimer) && pendingMessage) {
+        if (commitTimer) clearTimeout(commitTimer);
+        if (retryTimer) clearTimeout(retryTimer);
         commitTimer = null;
+        retryTimer = null;
         console.log('进程退出，立即提交挂起的数据...');
         // 同步方式提交，确保在进程退出前完成
         try {

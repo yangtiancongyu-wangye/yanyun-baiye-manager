@@ -1041,8 +1041,8 @@ app.post('/api/lotteries', (req, res) => {
         const lotteries = mergeLotteryHistory(existingLotteries, incomingLotteries);
         fs.writeFileSync(LOTTERIES_FILE, JSON.stringify(lotteries, null, 2));
 
-        // 先让运行中的服务保存成功并继续抽奖，远端 GitHub 同步放到后台执行。
-        debouncedCommit('更新抽奖数据');
+        // 先让运行中的服务保存成功并继续抽奖，远端 GitHub 同步立即在后台执行并失败重试。
+        debouncedCommit('更新抽奖数据', 0);
 
         res.json({ success: true });
     } catch (error) {
