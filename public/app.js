@@ -2091,6 +2091,7 @@ function renderArcheryEggLotteryAnimation(container, allPlayers, winners, prizes
     resultPanel.className = 'archery-result-panel';
     field.appendChild(resultPanel);
 
+    const sfx = createArcherySfx();
     const visiblePlayers = buildVisibleLotteryPlayers(allPlayers, winners);
     const eggMap = new Map();
 
@@ -2138,7 +2139,7 @@ function renderArcheryEggLotteryAnimation(container, allPlayers, winners, prizes
 
         resetArrow();
         eggsArea.querySelectorAll('.archery-egg').forEach(egg => {
-            egg.classList.remove('is-aimed');
+            egg.classList.remove('is-aimed', 'is-target');
         });
 
         const sweepList = buildSweepList(visiblePlayers, winner);
@@ -2155,10 +2156,11 @@ function renderArcheryEggLotteryAnimation(container, allPlayers, winners, prizes
         setTimeout(() => {
             clearInterval(sweepTimer);
             eggsArea.querySelectorAll('.archery-egg.is-aimed').forEach(egg => egg.classList.remove('is-aimed'));
-            targetEgg.classList.add('is-aimed');
+            targetEgg.classList.add('is-aimed', 'is-target');
+            targetEgg.style.opacity = '1';
             shootArrowAt(targetEgg, () => {
                 targetEgg.classList.remove('is-aimed');
-                targetEgg.classList.add('is-hit', 'is-winner');
+                targetEgg.classList.add('is-hit', 'is-winner', 'is-target');
                 createImpactBurst(targetEgg);
                 addResultChip(prizeName, winner);
                 subtitle.textContent = `射中 ${winner}`;
@@ -2205,10 +2207,12 @@ function renderArcheryEggLotteryAnimation(container, allPlayers, winners, prizes
         bow.classList.add('is-drawn', 'is-charging');
         chargeRing.classList.add('is-charging');
         aimLine.classList.add('is-visible');
+        sfx.draw();
 
         requestAnimationFrame(() => {
             requestAnimationFrame(() => {
                 setTimeout(() => {
+                    sfx.release();
                     bow.classList.remove('is-drawn', 'is-charging');
                     bow.classList.add('is-releasing');
                     chargeRing.classList.remove('is-charging');
@@ -2288,6 +2292,7 @@ function renderArcheryEggLotteryAnimation(container, allPlayers, winners, prizes
 
             const name = document.createElement('strong');
             name.textContent = winner;
+            name.style.fontSize = getFinalWinnerFontSize(winner);
             card.appendChild(name);
 
             finalList.appendChild(card);
@@ -2312,6 +2317,7 @@ function renderArcheryEggLotteryAnimation(container, allPlayers, winners, prizes
         field.appendChild(burst);
 
         targetEgg.classList.add('is-cracked');
+        sfx.hit();
 
         for (let i = 0; i < 34; i++) {
             const spark = document.createElement('span');
@@ -2347,6 +2353,90 @@ function renderArcheryEggLotteryAnimation(container, allPlayers, winners, prizes
         if (name.length <= 5) return '18px';
         if (name.length <= 7) return '15px';
         return '13px';
+    }
+
+    function getFinalWinnerFontSize(name) {
+        if (name.length <= 3) return '64px';
+        if (name.length <= 5) return '52px';
+        if (name.length <= 7) return '42px';
+        if (name.length <= 10) return '34px';
+        return '28px';
+    }
+
+    function createArcherySfx() {
+        let audioCtx = null;
+
+        function getContext() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+            return audioCtx;
+        }
+
+        function tone({ frequency, endFrequency, duration, type = 'sine', gain = 0.1, delay = 0 }) {
+            if (!window.AudioContext && !window.webkitAudioContext) return;
+            const ctx = getContext();
+            const start = ctx.currentTime + delay;
+            const oscillator = ctx.createOscillator();
+            const volume = ctx.createGain();
+
+            oscillator.type = type;
+            oscillator.frequency.setValueAtTime(frequency, start);
+            if (endFrequency) {
+                oscillator.frequency.exponentialRampToValueAtTime(endFrequency, start + duration);
+            }
+            volume.gain.setValueAtTime(0.0001, start);
+            volume.gain.exponentialRampToValueAtTime(gain, start + 0.018);
+            volume.gain.exponentialRampToValueAtTime(0.0001, start + duration);
+            oscillator.connect(volume);
+            volume.connect(ctx.destination);
+            oscillator.start(start);
+            oscillator.stop(start + duration + 0.03);
+        }
+
+        function noise({ duration, gain = 0.08, delay = 0, filter = 900 }) {
+            if (!window.AudioContext && !window.webkitAudioContext) return;
+            const ctx = getContext();
+            const start = ctx.currentTime + delay;
+            const buffer = ctx.createBuffer(1, Math.max(1, Math.floor(ctx.sampleRate * duration)), ctx.sampleRate);
+            const data = buffer.getChannelData(0);
+            for (let i = 0; i < data.length; i++) {
+                data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / data.length, 1.5);
+            }
+            const source = ctx.createBufferSource();
+            const band = ctx.createBiquadFilter();
+            const volume = ctx.createGain();
+            source.buffer = buffer;
+            band.type = 'bandpass';
+            band.frequency.setValueAtTime(filter, start);
+            band.Q.setValueAtTime(0.8, start);
+            volume.gain.setValueAtTime(gain, start);
+            volume.gain.exponentialRampToValueAtTime(0.0001, start + duration);
+            source.connect(band);
+            band.connect(volume);
+            volume.connect(ctx.destination);
+            source.start(start);
+            source.stop(start + duration);
+        }
+
+        return {
+            draw() {
+                tone({ frequency: 160, endFrequency: 90, duration: 0.48, type: 'triangle', gain: 0.08 });
+                tone({ frequency: 420, endFrequency: 280, duration: 0.38, type: 'sine', gain: 0.035, delay: 0.08 });
+            },
+            release() {
+                noise({ duration: 0.32, gain: 0.11, filter: 1700 });
+                tone({ frequency: 720, endFrequency: 180, duration: 0.28, type: 'sawtooth', gain: 0.055 });
+            },
+            hit() {
+                noise({ duration: 0.42, gain: 0.14, filter: 520 });
+                tone({ frequency: 130, endFrequency: 60, duration: 0.36, type: 'square', gain: 0.08 });
+                tone({ frequency: 880, endFrequency: 440, duration: 0.18, type: 'triangle', gain: 0.04, delay: 0.02 });
+            }
+        };
     }
 }
 
@@ -2679,6 +2769,11 @@ function ensureArcheryLotteryStyles() {
             filter: brightness(1.12);
             animation: eggAim 0.45s ease-in-out infinite;
         }
+        .archery-egg.is-target {
+            opacity: 1 !important;
+            z-index: 12;
+            transform: translateY(0) scale(1.06);
+        }
         .archery-egg.is-hit {
             animation: eggHit 0.5s ease forwards;
         }
@@ -2768,15 +2863,16 @@ function ensureArcheryLotteryStyles() {
             align-items: center;
             justify-content: center;
             flex-wrap: wrap;
-            gap: 22px;
-            padding: 56px;
+            gap: 18px;
+            padding: 44px;
             background: rgba(9, 13, 20, 0.84);
             backdrop-filter: blur(4px);
         }
         .archery-final-card {
-            min-width: 230px;
-            max-width: 340px;
-            padding: 28px 32px;
+            width: 280px;
+            height: 178px;
+            box-sizing: border-box;
+            padding: 22px 24px;
             border: 1px solid rgba(246, 212, 142, 0.66);
             border-radius: 8px;
             background: linear-gradient(160deg, rgba(255, 247, 230, 0.16), rgba(20, 31, 30, 0.94));
@@ -2785,19 +2881,33 @@ function ensureArcheryLotteryStyles() {
             box-shadow: 0 22px 60px rgba(0, 0, 0, 0.45), 0 0 28px rgba(245, 196, 95, 0.22);
             opacity: 0;
             animation: finalPop 0.62s ease forwards var(--final-delay);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
         }
         .archery-final-card span {
             display: block;
-            margin-bottom: 12px;
+            width: 100%;
+            margin-bottom: 14px;
             color: #f5c45f;
-            font-size: clamp(16px, 2vw, 24px);
+            font-size: 20px;
             font-weight: 700;
+            line-height: 1.15;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
         }
         .archery-final-card strong {
-            display: block;
-            font-size: clamp(38px, 5vw, 78px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            height: 82px;
             line-height: 1.05;
             overflow-wrap: anywhere;
+            word-break: break-word;
+            overflow: hidden;
         }
         .archery-lottery-field.showing-final .archery-eggs-area,
         .archery-lottery-field.showing-final .archery-bow,
@@ -2859,8 +2969,15 @@ function ensureArcheryLotteryStyles() {
                 align-content: center;
             }
             .archery-final-card {
-                min-width: min(260px, 86vw);
-                padding: 22px 24px;
+                width: min(250px, 84vw);
+                height: 150px;
+                padding: 18px 20px;
+            }
+            .archery-final-card span {
+                font-size: 17px;
+            }
+            .archery-final-card strong {
+                height: 70px;
             }
         }
     `;
