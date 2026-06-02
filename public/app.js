@@ -2140,11 +2140,12 @@ function renderArcheryEggLotteryAnimation(container, allPlayers, winners, prizes
 
     const sfx = createArcherySfx();
     const visiblePlayers = buildVisibleLotteryPlayers(allPlayers, winners);
-    const eggMap = new Map();
-    const cyclingEggs = [];
+    const eggItems = [];
+    const eggItemMap = new Map();
     let cycleTimer = null;
     let cycleEggIndex = 0;
     let cyclePlayerIndex = 0;
+    let lastTargetRegion = null;
     const shownPlayerIds = new Set();
     const uniquePlayerIds = Array.from(new Set(allPlayers));
 
@@ -2166,11 +2167,9 @@ function renderArcheryEggLotteryAnimation(container, allPlayers, winners, prizes
 
         eggsArea.appendChild(egg);
         markPlayerShown(playerId);
-        if (winners.includes(playerId) && !eggMap.has(playerId)) {
-            eggMap.set(playerId, egg);
-        } else {
-            cyclingEggs.push({ egg, name, slotIndex: index });
-        }
+        const item = { egg, name, slotIndex: index, isChanging: false, pendingTimer: null };
+        eggItems.push(item);
+        eggItemMap.set(egg, item);
     });
 
     const displayQueue = buildPlayerDisplayQueue(allPlayers, shownPlayerIds);
@@ -2185,7 +2184,7 @@ function renderArcheryEggLotteryAnimation(container, allPlayers, winners, prizes
 
         const winner = winners[winnerIndex];
         const prizeName = prizes[winnerIndex] || `奖品${winnerIndex + 1}`;
-        const targetEgg = eggMap.get(winner);
+        const targetEgg = chooseTargetEgg();
 
         title.textContent = '加州和鸣';
         subtitle.textContent = `第 ${winnerIndex + 1} 箭 · ${prizeName} 正在寻找目标`;
@@ -2215,29 +2214,34 @@ function renderArcheryEggLotteryAnimation(container, allPlayers, winners, prizes
             eggsArea.querySelectorAll('.archery-egg.is-aimed').forEach(egg => egg.classList.remove('is-aimed'));
             targetEgg.classList.add('is-aimed', 'is-target');
             targetEgg.style.opacity = '1';
-            shootArrowAt(targetEgg, () => {
-                targetEgg.classList.remove('is-aimed');
-                targetEgg.classList.add('is-hit', 'is-winner', 'is-target');
-                createImpactBurst(targetEgg);
-                addResultChip(prizeName, winner);
-                subtitle.textContent = `射中 ${winner}`;
+            targetEgg.classList.add('is-locked-target');
+            revealWinnerOnEgg(targetEgg, winner);
 
-                setTimeout(() => {
-                    runArrowSequence(winnerIndex + 1);
-                }, 1050);
-            });
+            setTimeout(() => {
+                shootArrowAt(targetEgg, () => {
+                    targetEgg.classList.remove('is-aimed', 'is-locked-target');
+                    targetEgg.classList.add('is-hit', 'is-winner', 'is-target');
+                    createImpactBurst(targetEgg);
+                    addResultChip(prizeName, winner);
+                    subtitle.textContent = `射中 ${winner}`;
+
+                    setTimeout(() => {
+                        runArrowSequence(winnerIndex + 1);
+                    }, 1050);
+                });
+            }, 260);
         }, 1900 + winnerIndex * 250);
     }
 
     function waitForAllPlayersShownThenShowFinal() {
-        if (allPlayersShown() || cyclingEggs.length === 0) {
+        if (allPlayersShown() || eggItems.length === 0) {
             showFinalResults();
             return;
         }
 
         subtitle.textContent = '中奖结果已确认，奖池名单继续滚动';
         const waitTimer = setInterval(() => {
-            if (!allPlayersShown() && cyclingEggs.length > 0) return;
+            if (!allPlayersShown() && eggItems.length > 0) return;
 
             clearInterval(waitTimer);
             showFinalResults();
@@ -2417,22 +2421,12 @@ function renderArcheryEggLotteryAnimation(container, allPlayers, winners, prizes
         const uniquePlayers = Array.from(new Set(players));
         if (uniquePlayers.length === 0 && selectedWinners.length === 0) return [];
 
-        const winnerSet = new Set(selectedWinners);
-        const nonWinners = uniquePlayers.filter(player => !winnerSet.has(player)).sort(() => Math.random() - 0.5);
         const viewportWidth = window.innerWidth || document.documentElement.clientWidth || 1200;
         const baseVisible = viewportWidth <= 760 ? 12 : 24;
         const maxVisible = Math.max(selectedWinners.length, baseVisible);
         const visible = new Array(maxVisible).fill(null);
         const availablePlayers = uniquePlayers.length > 0 ? uniquePlayers : selectedWinners;
-        selectedWinners.forEach((winner, index) => {
-            const slot = Math.min(maxVisible - 1, Math.round(((index + 1) * maxVisible) / (selectedWinners.length + 1)));
-            let targetSlot = slot;
-            while (visible[targetSlot] && targetSlot < maxVisible - 1) targetSlot++;
-            while (visible[targetSlot] && targetSlot > 0) targetSlot--;
-            visible[targetSlot] = winner;
-        });
-
-        const firstPassPlayers = nonWinners.filter(player => !visible.includes(player));
+        const firstPassPlayers = [...uniquePlayers].sort(() => Math.random() - 0.5);
         let firstPassIndex = 0;
         for (let i = 0; i < visible.length; i++) {
             if (visible[i] || firstPassIndex >= firstPassPlayers.length) continue;
@@ -2469,26 +2463,19 @@ function renderArcheryEggLotteryAnimation(container, allPlayers, winners, prizes
     }
 
     function startEggNameCycling() {
-        if (cyclingEggs.length === 0 || displayQueue.length === 0) return;
+        if (eggItems.length === 0 || displayQueue.length === 0) return;
 
         cycleTimer = setInterval(() => {
-            const updatesPerTick = Math.max(1, Math.ceil(cyclingEggs.length / 8));
+            const updatesPerTick = Math.max(1, Math.ceil(eggItems.length / 5));
             for (let i = 0; i < updatesPerTick; i++) {
-                const item = cyclingEggs[(cycleEggIndex + i) % cyclingEggs.length];
-                if (!item || item.egg.classList.contains('is-winner')) continue;
+                const item = eggItems[(cycleEggIndex + i) % eggItems.length];
+                if (!item || item.isChanging || item.egg.classList.contains('is-winner') || item.egg.classList.contains('is-locked-target')) continue;
 
                 const playerId = getNextDisplayPlayer(item.slotIndex);
-
-                item.egg.dataset.playerId = playerId;
-                item.name.textContent = playerId;
-                item.name.style.fontSize = getEggNameFontSize(playerId);
-                markPlayerShown(playerId);
-                item.name.classList.remove('is-name-flip');
-                void item.name.offsetWidth;
-                item.name.classList.add('is-name-flip');
+                updateEggName(item, playerId);
             }
-            cycleEggIndex = (cycleEggIndex + updatesPerTick) % cyclingEggs.length;
-        }, 620);
+            cycleEggIndex = (cycleEggIndex + updatesPerTick) % eggItems.length;
+        }, 720);
     }
 
     function stopEggNameCycling() {
@@ -2526,6 +2513,80 @@ function renderArcheryEggLotteryAnimation(container, allPlayers, winners, prizes
         if (nextEgg?.dataset.playerId) names.add(nextEgg.dataset.playerId);
 
         return names;
+    }
+
+    function chooseTargetEgg() {
+        const candidates = eggItems.filter(item => !item.egg.classList.contains('is-winner'));
+        if (candidates.length === 0) return eggItems[0]?.egg || null;
+
+        const nonRepeatingRegion = candidates.filter(item => getEggRegion(item.slotIndex) !== lastTargetRegion);
+        const pool = nonRepeatingRegion.length > 0 ? nonRepeatingRegion : candidates;
+        const selected = pool[Math.floor(Math.random() * pool.length)];
+        lastTargetRegion = getEggRegion(selected.slotIndex);
+        return selected.egg;
+    }
+
+    function getEggRegion(slotIndex) {
+        const columnCount = getEggColumnCount();
+        const row = Math.floor(slotIndex / columnCount);
+        const column = slotIndex % columnCount;
+        const horizontal = column < columnCount / 3 ? 'left' : column < columnCount * 2 / 3 ? 'center' : 'right';
+        const vertical = row % 2 === 0 ? 'top' : 'bottom';
+        return `${vertical}-${horizontal}`;
+    }
+
+    function getEggColumnCount() {
+        const computed = getComputedStyle(eggsArea);
+        const columns = computed.gridTemplateColumns.split(' ').filter(column => column && column !== 'none').length;
+        return Math.max(1, columns || 4);
+    }
+
+    function revealWinnerOnEgg(egg, winner) {
+        const item = eggItemMap.get(egg);
+        if (!item) return;
+
+        updateEggName(item, winner, { immediate: true, markShown: true });
+    }
+
+    function updateEggName(item, playerId, options = {}) {
+        const { immediate = false, markShown = true } = options;
+        if (!item || !playerId) return;
+
+        if (item.pendingTimer) {
+            clearTimeout(item.pendingTimer);
+            item.pendingTimer = null;
+        }
+
+        const applyName = () => {
+            item.egg.dataset.playerId = playerId;
+            item.name.textContent = playerId;
+            item.name.style.fontSize = getEggNameFontSize(playerId);
+            if (markShown) markPlayerShown(playerId);
+        };
+
+        item.name.classList.remove('is-name-out', 'is-name-in');
+        void item.name.offsetWidth;
+
+        if (immediate) {
+            applyName();
+            item.name.classList.add('is-name-in');
+            item.isChanging = false;
+            return;
+        }
+
+        item.isChanging = true;
+        item.name.classList.add('is-name-out');
+        item.pendingTimer = setTimeout(() => {
+            applyName();
+            item.name.classList.remove('is-name-out');
+            void item.name.offsetWidth;
+            item.name.classList.add('is-name-in');
+            item.pendingTimer = null;
+            setTimeout(() => {
+                item.name.classList.remove('is-name-in');
+                item.isChanging = false;
+            }, 260);
+        }, 170);
     }
 
     function pickNonAdjacentPlayer(players, visible, index, seed = 0) {
@@ -2727,9 +2788,13 @@ function ensureArcheryLotteryStyles() {
             50% { box-shadow: 0 16px 36px rgba(0, 0, 0, 0.34), 0 0 0 12px rgba(213, 70, 54, 0.26); }
         }
         @keyframes eggNameFlip {
-            0% { filter: brightness(1); transform: translateY(0) scale(1); }
-            45% { filter: brightness(1.28); transform: translateY(-6px) scale(1.05); }
-            100% { filter: brightness(1); transform: translateY(0) scale(1); }
+            0% { opacity: 0; filter: blur(6px) brightness(1.4); transform: translateY(8px) scale(0.86); }
+            55% { opacity: 1; filter: blur(0) brightness(1.18); transform: translateY(-4px) scale(1.08); }
+            100% { opacity: 1; filter: blur(0) brightness(1); transform: translateY(0) scale(1); }
+        }
+        @keyframes eggNameOut {
+            0% { opacity: 1; filter: blur(0); transform: translateY(0) scale(1); }
+            100% { opacity: 0; filter: blur(7px); transform: translateY(-10px) scale(0.78); }
         }
         @keyframes eggHit {
             0% { transform: scale(1) rotate(0); }
@@ -2934,20 +2999,20 @@ function ensureArcheryLotteryStyles() {
             pointer-events: none;
         }
         .archery-mascot-cat {
-            left: 8%;
+            left: 4%;
             bottom: 9%;
-            width: 166px;
-            height: 232px;
+            width: 142px;
+            height: 214px;
             animation: catBreath 3.4s ease-in-out infinite;
             transform-origin: 50% 88%;
             z-index: 3;
         }
         .cat-cape {
             position: absolute;
-            left: 16px;
+            left: 8px;
             bottom: 34px;
-            width: 112px;
-            height: 122px;
+            width: 96px;
+            height: 112px;
             border-radius: 54% 28% 56% 36%;
             background:
                 linear-gradient(140deg, rgba(255, 247, 230, 0.72) 0 12px, transparent 13px),
@@ -2958,13 +3023,13 @@ function ensureArcheryLotteryStyles() {
         }
         .cat-body {
             position: absolute;
-            left: 43px;
+            left: 34px;
             bottom: 26px;
-            width: 90px;
-            height: 120px;
+            width: 76px;
+            height: 105px;
             border-radius: 48% 48% 44% 44%;
             background:
-                radial-gradient(ellipse at 49% 58%, #f7d8b8 0 22px, transparent 23px),
+                radial-gradient(ellipse at 49% 58%, #f7d8b8 0 18px, transparent 19px),
                 radial-gradient(circle at 30% 24%, rgba(255,255,255,0.98), transparent 29%),
                 linear-gradient(145deg, #fffef6 0%, #f2e7d9 62%, #d8c5b4 100%);
             border: 2px solid rgba(95, 74, 56, 0.24);
@@ -2973,10 +3038,10 @@ function ensureArcheryLotteryStyles() {
         }
         .cat-head {
             position: absolute;
-            left: 28px;
-            top: 21px;
-            width: 108px;
-            height: 94px;
+            left: 24px;
+            top: 22px;
+            width: 92px;
+            height: 82px;
             border-radius: 48% 48% 45% 45%;
             background:
                 radial-gradient(circle at 31% 28%, rgba(255,255,255,0.95), transparent 28%),
@@ -2988,18 +3053,18 @@ function ensureArcheryLotteryStyles() {
         .cat-ear {
             position: absolute;
             top: -22px;
-            width: 34px;
-            height: 40px;
+            width: 30px;
+            height: 36px;
             background: linear-gradient(145deg, #fffef5, #dfd0bf);
             border: 2px solid rgba(95, 74, 56, 0.2);
             clip-path: polygon(50% 0, 100% 100%, 0 100%);
         }
         .cat-ear.left {
-            left: 15px;
+            left: 13px;
             transform: rotate(-18deg);
         }
         .cat-ear.right {
-            right: 14px;
+            right: 13px;
             transform: rotate(17deg);
         }
         .cat-ear::after {
@@ -3015,10 +3080,10 @@ function ensureArcheryLotteryStyles() {
         }
         .cat-crown {
             position: absolute;
-            left: 34px;
-            top: -28px;
-            width: 40px;
-            height: 30px;
+            left: 29px;
+            top: -25px;
+            width: 35px;
+            height: 26px;
             background: linear-gradient(180deg, #ffe58f, #d39a2f);
             clip-path: polygon(0 100%, 0 32%, 24% 68%, 50% 4%, 76% 68%, 100% 32%, 100% 100%);
             filter: drop-shadow(0 4px 4px rgba(62, 32, 13, 0.28));
@@ -3045,18 +3110,18 @@ function ensureArcheryLotteryStyles() {
         .cat-face::after {
             content: '';
             position: absolute;
-            top: 38px;
-            width: 10px;
-            height: 14px;
+            top: 34px;
+            width: 9px;
+            height: 13px;
             border-radius: 50%;
             background: #33251f;
             box-shadow: 0 0 0 3px rgba(255,255,255,0.34);
         }
         .cat-face::before {
-            left: 34px;
+            left: 29px;
         }
         .cat-face::after {
-            right: 34px;
+            right: 29px;
         }
         .cat-face {
             position: absolute;
@@ -3080,18 +3145,18 @@ function ensureArcheryLotteryStyles() {
         .cat-head::after {
             content: '';
             position: absolute;
-            left: 36px;
-            top: 58px;
-            width: 36px;
+            left: 31px;
+            top: 52px;
+            width: 31px;
             height: 15px;
             border-bottom: 3px solid rgba(77, 48, 35, 0.65);
             border-radius: 0 0 50% 50%;
         }
         .cat-collar {
             position: absolute;
-            left: 53px;
-            top: 126px;
-            width: 72px;
+            left: 41px;
+            top: 112px;
+            width: 65px;
             height: 20px;
             z-index: 5;
         }
@@ -3119,11 +3184,11 @@ function ensureArcheryLotteryStyles() {
         }
         .cat-tail {
             position: absolute;
-            left: 0;
+            left: -4px;
             bottom: 47px;
-            width: 62px;
-            height: 102px;
-            border: 14px solid #efe3d2;
+            width: 54px;
+            height: 90px;
+            border: 12px solid #efe3d2;
             border-right: 0;
             border-bottom: 0;
             border-radius: 70% 0 0 0;
@@ -3132,8 +3197,8 @@ function ensureArcheryLotteryStyles() {
         }
         .cat-arm {
             position: absolute;
-            width: 64px;
-            height: 20px;
+            width: 58px;
+            height: 18px;
             border-radius: 20px;
             background: linear-gradient(90deg, #f8f1e7, #dbc7b3);
             border: 2px solid rgba(95, 74, 56, 0.18);
@@ -3142,13 +3207,13 @@ function ensureArcheryLotteryStyles() {
             transition: transform 0.25s ease;
         }
         .cat-arm.bow-arm {
-            left: 96px;
-            top: 111px;
+            left: 82px;
+            top: 102px;
             transform: rotate(-14deg);
         }
         .cat-arm.string-arm {
-            left: 72px;
-            top: 121px;
+            left: 58px;
+            top: 111px;
             transform: rotate(10deg);
         }
         .archery-bow.is-drawn .cat-arm.string-arm {
@@ -3159,20 +3224,20 @@ function ensureArcheryLotteryStyles() {
         }
         .cat-paw {
             position: absolute;
-            width: 24px;
-            height: 24px;
+            width: 21px;
+            height: 21px;
             border-radius: 50%;
             background: #fff7ea;
             border: 2px solid rgba(95, 74, 56, 0.18);
             z-index: 6;
         }
         .cat-paw.front {
-            right: -2px;
-            top: 106px;
+            right: 1px;
+            top: 98px;
         }
         .cat-paw.back {
-            left: 58px;
-            top: 116px;
+            left: 47px;
+            top: 107px;
             transition: transform 0.25s ease;
         }
         .archery-bow.is-drawn .cat-paw.back {
@@ -3181,46 +3246,46 @@ function ensureArcheryLotteryStyles() {
         .cat-foot {
             position: absolute;
             bottom: 10px;
-            width: 42px;
-            height: 28px;
+            width: 36px;
+            height: 24px;
             border-radius: 50%;
             background: #efe1d0;
             border: 2px solid rgba(95, 74, 56, 0.16);
         }
         .cat-foot.front {
-            left: 88px;
+            left: 73px;
         }
         .cat-foot.back {
-            left: 39px;
+            left: 31px;
         }
         .archery-mascot-dog {
-            left: 1%;
-            bottom: 3%;
-            width: 126px;
-            height: 140px;
-            animation: dogBob 2.9s ease-in-out infinite;
+            left: 52%;
+            bottom: 2%;
+            width: 86px;
+            height: 78px;
+            animation: dogBob 3.2s ease-in-out infinite;
             transform-origin: 50% 100%;
-            z-index: 2;
+            z-index: 4;
         }
         .dog-body {
             position: absolute;
-            left: 28px;
-            bottom: 20px;
-            width: 80px;
-            height: 65px;
-            border-radius: 48% 44% 42% 40%;
+            left: 15px;
+            bottom: 10px;
+            width: 64px;
+            height: 38px;
+            border-radius: 50% 44% 44% 50%;
             background:
-                radial-gradient(ellipse at 48% 64%, #f7d2a1 0 22px, transparent 23px),
+                radial-gradient(ellipse at 50% 68%, #f7d2a1 0 15px, transparent 16px),
                 linear-gradient(145deg, #e1973d 0%, #c86b2e 70%, #914623 100%);
             border: 2px solid rgba(70, 42, 24, 0.24);
             box-shadow: inset -9px -9px 16px rgba(91, 50, 25, 0.2), 0 12px 18px rgba(0,0,0,0.18);
         }
         .dog-chest {
             position: absolute;
-            left: 52px;
-            bottom: 33px;
-            width: 35px;
-            height: 38px;
+            left: 38px;
+            bottom: 16px;
+            width: 26px;
+            height: 24px;
             border-radius: 50%;
             background: #fff0d3;
             z-index: 2;
@@ -3228,22 +3293,22 @@ function ensureArcheryLotteryStyles() {
         }
         .dog-head {
             position: absolute;
-            left: 36px;
-            top: 23px;
-            width: 70px;
-            height: 64px;
+            left: 40px;
+            top: 7px;
+            width: 43px;
+            height: 39px;
             border-radius: 46% 48% 45% 45%;
             background:
-                radial-gradient(circle at 50% 67%, #fff2d8 0 23px, transparent 24px),
+                radial-gradient(circle at 50% 68%, #fff2d8 0 14px, transparent 15px),
                 linear-gradient(145deg, #e59a41, #be632b);
             border: 2px solid rgba(70, 42, 24, 0.22);
             z-index: 3;
         }
         .dog-ear {
             position: absolute;
-            top: -14px;
-            width: 27px;
-            height: 35px;
+            top: -9px;
+            width: 18px;
+            height: 22px;
             background: #a95127;
             clip-path: polygon(50% 0, 100% 100%, 0 72%);
         }
@@ -3259,52 +3324,52 @@ function ensureArcheryLotteryStyles() {
         .dog-face::after {
             content: '';
             position: absolute;
-            top: 27px;
-            width: 8px;
-            height: 10px;
+            top: 17px;
+            width: 5px;
+            height: 7px;
             border-radius: 50%;
             background: #33251f;
             box-shadow: 0 0 0 3px rgba(255, 236, 198, 0.22);
         }
         .dog-face::before {
-            left: 21px;
+            left: 13px;
         }
         .dog-face::after {
-            right: 21px;
+            right: 13px;
         }
         .dog-head::after {
             content: '';
             position: absolute;
-            left: 32px;
-            top: 39px;
-            width: 8px;
-            height: 7px;
+            left: 20px;
+            top: 25px;
+            width: 5px;
+            height: 5px;
             border-radius: 50%;
             background: #4a2d20;
-            box-shadow: 0 9px 0 -2px rgba(74, 45, 32, 0.7);
+            box-shadow: 0 6px 0 -2px rgba(74, 45, 32, 0.7);
         }
         .dog-cheek {
             position: absolute;
-            top: 62px;
-            width: 14px;
-            height: 9px;
+            top: 31px;
+            width: 9px;
+            height: 6px;
             border-radius: 50%;
             background: rgba(219, 93, 72, 0.28);
             z-index: 4;
         }
         .dog-cheek.left {
-            left: 42px;
+            left: 47px;
         }
         .dog-cheek.right {
-            left: 88px;
+            left: 72px;
         }
         .dog-tail {
             position: absolute;
-            left: 6px;
-            bottom: 58px;
-            width: 44px;
-            height: 34px;
-            border: 10px solid #c86b2e;
+            left: 2px;
+            bottom: 31px;
+            width: 30px;
+            height: 23px;
+            border: 7px solid #c86b2e;
             border-left-color: #e1973d;
             border-bottom-color: transparent;
             border-radius: 50%;
@@ -3313,10 +3378,10 @@ function ensureArcheryLotteryStyles() {
         }
         .dog-scarf {
             position: absolute;
-            left: 38px;
-            top: 77px;
-            width: 64px;
-            height: 12px;
+            left: 42px;
+            top: 40px;
+            width: 38px;
+            height: 8px;
             border-radius: 999px;
             background: linear-gradient(90deg, #d54636, #f5c45f);
             z-index: 4;
@@ -3324,17 +3389,17 @@ function ensureArcheryLotteryStyles() {
         }
         .dog-leg {
             position: absolute;
-            bottom: 8px;
-            width: 17px;
-            height: 30px;
+            bottom: 3px;
+            width: 28px;
+            height: 10px;
             border-radius: 9px;
             background: #a95127;
         }
         .dog-leg.front {
-            left: 82px;
+            left: 52px;
         }
         .dog-leg.back {
-            left: 39px;
+            left: 20px;
         }
         .archery-charge-ring {
             position: absolute;
@@ -3498,6 +3563,12 @@ function ensureArcheryLotteryStyles() {
         }
         .archery-egg-name.is-name-flip {
             animation: eggNameFlip 0.34s ease-out;
+        }
+        .archery-egg-name.is-name-out {
+            animation: eggNameOut 0.17s ease-in forwards;
+        }
+        .archery-egg-name.is-name-in {
+            animation: eggNameFlip 0.28s ease-out forwards;
         }
         .archery-egg.is-hit {
             animation: eggHit 0.5s ease forwards;
