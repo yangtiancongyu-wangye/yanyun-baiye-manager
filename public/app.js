@@ -2066,6 +2066,18 @@ function renderArcheryEggLotteryAnimation(container, allPlayers, winners, prizes
     bow.innerHTML = '<div class="archery-bow-string"></div><div class="archery-bow-arc"></div>';
     field.appendChild(bow);
 
+    const chargeRing = document.createElement('div');
+    chargeRing.className = 'archery-charge-ring';
+    field.appendChild(chargeRing);
+
+    const aimLine = document.createElement('div');
+    aimLine.className = 'archery-aim-line';
+    field.appendChild(aimLine);
+
+    const arrowTrail = document.createElement('div');
+    arrowTrail.className = 'archery-arrow-trail';
+    field.appendChild(arrowTrail);
+
     const arrow = document.createElement('div');
     arrow.className = 'archery-arrow';
     arrow.innerHTML = '<span class="archery-arrow-head"></span><span class="archery-arrow-shaft"></span><span class="archery-arrow-fletching"></span>';
@@ -2174,19 +2186,49 @@ function renderArcheryEggLotteryAnimation(container, allPlayers, winners, prizes
         arrow.style.left = `${startX}px`;
         arrow.style.top = `${startY}px`;
         arrow.style.transform = `translate(-35%, -50%) rotate(${angle}deg)`;
-        bow.classList.add('is-drawn');
+        chargeRing.style.left = `${startX}px`;
+        chargeRing.style.top = `${startY}px`;
+        aimLine.style.left = `${startX}px`;
+        aimLine.style.top = `${startY}px`;
+        aimLine.style.width = `${Math.max(0, Math.hypot(distanceX, distanceY) - 42)}px`;
+        aimLine.style.transform = `translateY(-50%) rotate(${angle}deg)`;
+        arrowTrail.style.left = `${startX}px`;
+        arrowTrail.style.top = `${startY}px`;
+        arrowTrail.style.width = '0px';
+        arrowTrail.style.transform = `translateY(-50%) rotate(${angle}deg)`;
+        bow.classList.add('is-drawn', 'is-charging');
+        chargeRing.classList.add('is-charging');
+        aimLine.classList.add('is-visible');
 
         requestAnimationFrame(() => {
             requestAnimationFrame(() => {
-                bow.classList.remove('is-drawn');
-                arrow.style.transition = 'left 1.15s cubic-bezier(0.16, 0.84, 0.22, 1), top 1.15s cubic-bezier(0.16, 0.84, 0.22, 1), transform 1.15s cubic-bezier(0.16, 0.84, 0.22, 1)';
-                arrow.style.left = `${targetX}px`;
-                arrow.style.top = `${targetY}px`;
-                arrow.style.transform = `translate(-72%, -50%) rotate(${angle}deg)`;
+                setTimeout(() => {
+                    bow.classList.remove('is-drawn', 'is-charging');
+                    bow.classList.add('is-releasing');
+                    chargeRing.classList.remove('is-charging');
+                    chargeRing.classList.add('is-release');
+                    aimLine.classList.remove('is-visible');
+                    arrowTrail.classList.add('is-flying');
+                    arrowTrail.style.transition = 'width 1.8s cubic-bezier(0.18, 0.88, 0.2, 1), opacity 1.8s ease';
+                    arrowTrail.style.width = `${Math.max(80, Math.hypot(distanceX, distanceY) - 30)}px`;
+                    arrow.style.transition = 'left 1.8s cubic-bezier(0.18, 0.88, 0.2, 1), top 1.8s cubic-bezier(0.18, 0.88, 0.2, 1), transform 1.8s cubic-bezier(0.18, 0.88, 0.2, 1), filter 1.8s ease';
+                    arrow.style.left = `${targetX}px`;
+                    arrow.style.top = `${targetY}px`;
+                    arrow.style.transform = `translate(-72%, -50%) rotate(${angle}deg)`;
+                    arrow.style.filter = 'drop-shadow(0 0 26px rgba(245, 196, 95, 0.95)) drop-shadow(0 0 58px rgba(213, 70, 54, 0.52))';
+                }, 820);
             });
         });
 
-        setTimeout(done, 1160);
+        setTimeout(() => {
+            bow.classList.remove('is-releasing');
+            chargeRing.classList.remove('is-release');
+            arrowTrail.classList.remove('is-flying');
+            arrowTrail.style.transition = 'none';
+            arrowTrail.style.opacity = '';
+            arrow.style.filter = '';
+            done();
+        }, 2680);
     }
 
     function resetArrow() {
@@ -2195,6 +2237,12 @@ function renderArcheryEggLotteryAnimation(container, allPlayers, winners, prizes
         arrow.style.left = '7%';
         arrow.style.top = '50%';
         arrow.style.transform = 'translate(-35%, -50%) rotate(0deg)';
+        arrow.style.filter = '';
+        chargeRing.classList.remove('is-charging', 'is-release');
+        aimLine.classList.remove('is-visible');
+        arrowTrail.classList.remove('is-flying');
+        arrowTrail.style.transition = 'none';
+        arrowTrail.style.width = '0px';
     }
 
     function addResultChip(prizeName, winner) {
@@ -2256,17 +2304,19 @@ function renderArcheryEggLotteryAnimation(container, allPlayers, winners, prizes
         burst.style.top = `${eggRect.top - fieldRect.top + eggRect.height / 2}px`;
         field.appendChild(burst);
 
-        for (let i = 0; i < 18; i++) {
+        targetEgg.classList.add('is-cracked');
+
+        for (let i = 0; i < 34; i++) {
             const spark = document.createElement('span');
-            const angle = (Math.PI * 2 * i) / 18;
-            const distance = 54 + Math.random() * 56;
+            const angle = (Math.PI * 2 * i) / 34;
+            const distance = 72 + Math.random() * 92;
             spark.style.setProperty('--spark-x', `${Math.cos(angle) * distance}px`);
             spark.style.setProperty('--spark-y', `${Math.sin(angle) * distance}px`);
             spark.style.animationDelay = `${Math.random() * 0.08}s`;
             burst.appendChild(spark);
         }
 
-        setTimeout(() => burst.remove(), 950);
+        setTimeout(() => burst.remove(), 1250);
     }
 
     function buildSweepList(players, winner) {
@@ -2318,6 +2368,36 @@ function ensureArcheryLotteryStyles() {
             0% { transform: scale(1) rotate(0); }
             35% { transform: scale(1.14) rotate(-5deg); }
             100% { transform: scale(1.05) rotate(2deg); }
+        }
+        @keyframes bowCharge {
+            0%, 100% { filter: drop-shadow(0 0 16px rgba(246, 212, 142, 0.22)); }
+            50% { filter: drop-shadow(0 0 30px rgba(245, 196, 95, 0.72)) drop-shadow(0 0 54px rgba(213, 70, 54, 0.28)); }
+        }
+        @keyframes bowRelease {
+            0% { transform: translateY(-50%) scaleX(1); }
+            35% { transform: translateY(-50%) scaleX(1.08); }
+            100% { transform: translateY(-50%) scaleX(1); }
+        }
+        @keyframes chargePulse {
+            0% { opacity: 0; transform: translate(-50%, -50%) scale(0.45); }
+            25% { opacity: 0.8; }
+            100% { opacity: 0.18; transform: translate(-50%, -50%) scale(1.8); }
+        }
+        @keyframes chargeRelease {
+            0% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+            100% { opacity: 0; transform: translate(-50%, -50%) scale(2.6); }
+        }
+        @keyframes aimLinePulse {
+            0%, 100% { opacity: 0.28; filter: drop-shadow(0 0 8px rgba(245, 196, 95, 0.44)); }
+            50% { opacity: 0.9; filter: drop-shadow(0 0 18px rgba(245, 196, 95, 0.86)); }
+        }
+        @keyframes trailBurn {
+            0% { opacity: 0.9; filter: blur(0) drop-shadow(0 0 16px rgba(245, 196, 95, 0.72)); }
+            100% { opacity: 0; filter: blur(7px) drop-shadow(0 0 34px rgba(213, 70, 54, 0.52)); }
+        }
+        @keyframes arrowFletchFlash {
+            0%, 100% { opacity: 1; transform: scaleX(1); }
+            50% { opacity: 0.55; transform: scaleX(1.28); }
         }
         @keyframes sparkFly {
             from { opacity: 1; transform: translate(-50%, -50%) scale(1); }
@@ -2405,6 +2485,12 @@ function ensureArcheryLotteryStyles() {
             transform: translateY(-50%);
             z-index: 8;
         }
+        .archery-bow.is-charging .archery-bow-arc {
+            animation: bowCharge 0.64s ease-in-out infinite;
+        }
+        .archery-bow.is-releasing {
+            animation: bowRelease 0.34s ease-out;
+        }
         .archery-bow-arc {
             position: absolute;
             inset: 0 28px 0 0;
@@ -2423,7 +2509,63 @@ function ensureArcheryLotteryStyles() {
             transition: transform 0.25s ease;
         }
         .archery-bow.is-drawn .archery-bow-string {
-            transform: translateX(-26px);
+            transform: translateX(-48px);
+            background: #fff7e6;
+            box-shadow: 0 0 18px rgba(245, 196, 95, 0.76);
+        }
+        .archery-charge-ring {
+            position: absolute;
+            width: 96px;
+            height: 96px;
+            border: 2px solid rgba(245, 196, 95, 0.74);
+            border-radius: 50%;
+            opacity: 0;
+            z-index: 6;
+            pointer-events: none;
+            box-shadow: 0 0 28px rgba(245, 196, 95, 0.42), inset 0 0 22px rgba(213, 70, 54, 0.18);
+        }
+        .archery-charge-ring::before,
+        .archery-charge-ring::after {
+            content: '';
+            position: absolute;
+            inset: 12px;
+            border: 1px solid rgba(255, 247, 230, 0.54);
+            border-radius: 50%;
+        }
+        .archery-charge-ring::after {
+            inset: 28px;
+            background: radial-gradient(circle, rgba(245, 196, 95, 0.52), transparent 62%);
+        }
+        .archery-charge-ring.is-charging {
+            animation: chargePulse 0.78s ease-in-out infinite;
+        }
+        .archery-charge-ring.is-release {
+            animation: chargeRelease 0.48s ease-out forwards;
+        }
+        .archery-aim-line {
+            position: absolute;
+            height: 2px;
+            opacity: 0;
+            z-index: 5;
+            transform-origin: left center;
+            pointer-events: none;
+            background: repeating-linear-gradient(90deg, rgba(245, 196, 95, 0.95) 0 18px, transparent 18px 32px);
+        }
+        .archery-aim-line.is-visible {
+            animation: aimLinePulse 0.34s ease-in-out infinite;
+        }
+        .archery-arrow-trail {
+            position: absolute;
+            height: 14px;
+            opacity: 0;
+            z-index: 8;
+            transform-origin: left center;
+            pointer-events: none;
+            background: linear-gradient(90deg, rgba(213, 70, 54, 0.02), rgba(245, 196, 95, 0.82), rgba(255, 247, 230, 0.96));
+            clip-path: polygon(0 50%, 78% 0, 100% 50%, 78% 100%);
+        }
+        .archery-arrow-trail.is-flying {
+            animation: trailBurn 1.8s ease-out forwards;
         }
         .archery-arrow {
             position: absolute;
@@ -2435,6 +2577,7 @@ function ensureArcheryLotteryStyles() {
             z-index: 9;
             pointer-events: none;
             transform-origin: 72% 50%;
+            filter: drop-shadow(0 0 16px rgba(245, 196, 95, 0.55));
         }
         .archery-arrow-shaft {
             position: absolute;
@@ -2464,6 +2607,7 @@ function ensureArcheryLotteryStyles() {
             height: 14px;
             background: linear-gradient(135deg, #d54636 0 50%, #fff7e6 50% 100%);
             clip-path: polygon(0 0, 100% 50%, 0 100%, 28% 50%);
+            animation: arrowFletchFlash 0.28s ease-in-out infinite;
         }
         .archery-eggs-area {
             position: absolute;
@@ -2534,6 +2678,30 @@ function ensureArcheryLotteryStyles() {
             border-color: rgba(255, 247, 230, 0.88);
             box-shadow: 0 18px 46px rgba(0, 0, 0, 0.42), 0 0 32px rgba(245, 196, 95, 0.48);
         }
+        .archery-egg.is-cracked::before,
+        .archery-egg.is-cracked::after {
+            content: '';
+            position: absolute;
+            z-index: 3;
+            background: rgba(74, 39, 23, 0.78);
+            transform-origin: center;
+            clip-path: polygon(42% 0, 58% 0, 52% 34%, 68% 34%, 46% 100%, 51% 48%, 34% 48%);
+        }
+        .archery-egg.is-cracked::before {
+            width: 24px;
+            height: 78px;
+            top: 22px;
+            left: 45px;
+            transform: rotate(-8deg);
+        }
+        .archery-egg.is-cracked::after {
+            width: 18px;
+            height: 52px;
+            top: 38px;
+            left: 57px;
+            transform: rotate(24deg);
+            opacity: 0.7;
+        }
         .archery-result-panel {
             position: absolute;
             left: 24px;
@@ -2573,12 +2741,12 @@ function ensureArcheryLotteryStyles() {
             position: absolute;
             left: 0;
             top: 0;
-            width: 9px;
-            height: 9px;
+            width: 11px;
+            height: 11px;
             border-radius: 50%;
-            background: #fff7e6;
-            box-shadow: 0 0 14px #f5c45f;
-            animation: sparkFly 0.72s ease-out forwards;
+            background: radial-gradient(circle, #fff7e6, #f5c45f 58%, rgba(213, 70, 54, 0.8));
+            box-shadow: 0 0 18px #f5c45f, 0 0 34px rgba(213, 70, 54, 0.62);
+            animation: sparkFly 1.05s ease-out forwards;
         }
         .archery-final-list {
             position: absolute;
