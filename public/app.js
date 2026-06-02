@@ -2175,17 +2175,18 @@ function renderArcheryEggLotteryAnimation(container, allPlayers, winners, prizes
         const eggRect = targetEgg.getBoundingClientRect();
         const targetX = eggRect.left - fieldRect.left + eggRect.width * 0.46;
         const targetY = eggRect.top - fieldRect.top + eggRect.height * 0.5;
-        const bowLeft = fieldRect.width * 0.036;
-        const startX = bowLeft + 32;
-        const startY = targetY;
+        const bowRect = bow.getBoundingClientRect();
+        const bowLeft = bowRect.left - fieldRect.left;
+        const startX = bowLeft + (bowRect.width <= 70 ? 22 : 30);
+        const startY = fieldRect.height / 2;
         const distanceX = targetX - startX;
         const distanceY = targetY - startY;
         const angle = Math.atan2(distanceY, distanceX) * 180 / Math.PI;
-        const arrowLength = 176;
+        const arrowLength = parseFloat(getComputedStyle(arrow).width) || 176;
         const finalNockX = targetX - Math.cos(angle * Math.PI / 180) * arrowLength;
         const finalNockY = targetY - Math.sin(angle * Math.PI / 180) * arrowLength;
 
-        bow.style.top = `${startY}px`;
+        bow.style.top = '50%';
         arrow.style.transition = 'none';
         arrow.style.opacity = '1';
         arrow.style.left = `${startX}px`;
@@ -2335,7 +2336,8 @@ function renderArcheryEggLotteryAnimation(container, allPlayers, winners, prizes
         const uniquePlayers = Array.from(new Set(players));
         const winnerSet = new Set(selectedWinners);
         const nonWinners = uniquePlayers.filter(player => !winnerSet.has(player)).sort(() => Math.random() - 0.5);
-        const maxVisible = Math.max(18, Math.min(36, uniquePlayers.length));
+        const viewportWidth = window.innerWidth || document.documentElement.clientWidth || 1200;
+        const maxVisible = Math.max(selectedWinners.length, Math.min(viewportWidth <= 760 ? 12 : 24, uniquePlayers.length));
         const fillerCount = Math.max(0, maxVisible - selectedWinners.length);
         return [...selectedWinners, ...nonWinners.slice(0, fillerCount)].sort(() => Math.random() - 0.5);
     }
@@ -2415,14 +2417,15 @@ function ensureArcheryLotteryStyles() {
         }
         .archery-lottery-stage {
             width: 100%;
-            min-height: 100vh;
+            height: 100vh;
             position: relative;
             overflow: hidden;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            padding: 28px 32px 34px;
+            box-sizing: border-box;
+            padding: clamp(14px, 2.4vh, 24px) clamp(14px, 2.6vw, 32px);
             background:
                 linear-gradient(180deg, rgba(17, 24, 39, 0.72), rgba(8, 13, 23, 0.92)),
                 radial-gradient(circle at 22% 22%, rgba(191, 92, 58, 0.24), transparent 30%),
@@ -2445,24 +2448,26 @@ function ensureArcheryLotteryStyles() {
             position: relative;
             z-index: 3;
             text-align: center;
-            margin-bottom: 22px;
+            margin-bottom: clamp(10px, 1.8vh, 18px);
+            flex: 0 0 auto;
         }
         .archery-lottery-title {
-            font-size: clamp(36px, 5.6vw, 78px);
+            font-size: clamp(28px, 4.6vw, 62px);
             font-weight: 900;
             letter-spacing: 0;
             text-shadow: 0 5px 24px rgba(0, 0, 0, 0.58), 0 0 30px rgba(246, 212, 142, 0.34);
         }
         .archery-lottery-subtitle {
-            margin-top: 10px;
-            font-size: clamp(16px, 2vw, 25px);
+            margin-top: 6px;
+            font-size: clamp(14px, 1.7vw, 21px);
             color: rgba(255, 247, 230, 0.82);
         }
         .archery-lottery-field {
             width: min(1320px, 96vw);
-            height: min(670px, 68vh);
-            min-height: 470px;
+            height: clamp(390px, 70vh, 630px);
+            max-height: calc(100vh - 118px);
             position: relative;
+            flex: 0 1 auto;
             z-index: 2;
             border: 1px solid rgba(246, 212, 142, 0.28);
             border-radius: 8px;
@@ -2484,10 +2489,10 @@ function ensureArcheryLotteryStyles() {
         }
         .archery-bow {
             position: absolute;
-            left: 3.6%;
+            left: 3.2%;
             top: 50%;
-            width: 110px;
-            height: 300px;
+            width: 92px;
+            height: 238px;
             transform: translateY(-50%);
             z-index: 8;
         }
@@ -2499,30 +2504,30 @@ function ensureArcheryLotteryStyles() {
         }
         .archery-bow-arc {
             position: absolute;
-            inset: 0 28px 0 0;
-            border-right: 10px solid #c07c42;
+            inset: 0 22px 0 0;
+            border-right: 8px solid #c07c42;
             border-radius: 0 100% 100% 0;
             filter: drop-shadow(0 0 16px rgba(246, 212, 142, 0.22));
         }
         .archery-bow-string {
             position: absolute;
-            top: 16px;
-            bottom: 16px;
-            right: 30px;
+            top: 14px;
+            bottom: 14px;
+            right: 24px;
             width: 2px;
             background: rgba(255, 247, 230, 0.8);
             transform-origin: center;
             transition: transform 0.25s ease;
         }
         .archery-bow.is-drawn .archery-bow-string {
-            transform: translateX(-48px);
+            transform: translateX(-38px);
             background: #fff7e6;
             box-shadow: 0 0 18px rgba(245, 196, 95, 0.76);
         }
         .archery-charge-ring {
             position: absolute;
-            width: 96px;
-            height: 96px;
+            width: 78px;
+            height: 78px;
             border: 2px solid rgba(245, 196, 95, 0.74);
             border-radius: 50%;
             opacity: 0;
@@ -2539,7 +2544,7 @@ function ensureArcheryLotteryStyles() {
             border-radius: 50%;
         }
         .archery-charge-ring::after {
-            inset: 28px;
+            inset: 22px;
             background: radial-gradient(circle, rgba(245, 196, 95, 0.52), transparent 62%);
         }
         .archery-charge-ring.is-charging {
@@ -2577,12 +2582,12 @@ function ensureArcheryLotteryStyles() {
             position: absolute;
             left: 7%;
             top: 50%;
-            width: 190px;
+            width: 176px;
             height: 18px;
             opacity: 0;
             z-index: 9;
             pointer-events: none;
-            transform-origin: 72% 50%;
+            transform-origin: left center;
             filter: drop-shadow(0 0 16px rgba(245, 196, 95, 0.55));
         }
         .archery-arrow-shaft {
@@ -2617,26 +2622,27 @@ function ensureArcheryLotteryStyles() {
         }
         .archery-eggs-area {
             position: absolute;
-            left: 20%;
+            left: clamp(118px, 17%, 210px);
             right: 4%;
-            top: 12%;
-            bottom: 15%;
+            top: 10%;
+            bottom: 18%;
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(112px, 1fr));
-            grid-auto-rows: minmax(116px, 1fr);
+            grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+            grid-auto-rows: minmax(100px, 1fr);
             align-items: center;
             justify-items: center;
-            gap: 14px 16px;
+            gap: 10px 12px;
             z-index: 4;
+            overflow: visible;
         }
         .archery-egg {
-            width: 104px;
-            height: 132px;
+            width: 88px;
+            height: 112px;
             position: relative;
             display: flex;
             align-items: center;
             justify-content: center;
-            padding: 22px 14px 18px;
+            padding: 18px 11px 14px;
             color: #3c2519;
             background:
                 radial-gradient(circle at 33% 22%, rgba(255, 255, 255, 0.94), transparent 18%),
@@ -2650,7 +2656,7 @@ function ensureArcheryLotteryStyles() {
             transition: filter 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
         }
         .archery-egg-name {
-            max-width: 82px;
+            max-width: 70px;
             line-height: 1.08;
             font-weight: 900;
             text-align: center;
@@ -2661,10 +2667,10 @@ function ensureArcheryLotteryStyles() {
         }
         .archery-egg-shine {
             position: absolute;
-            width: 22px;
-            height: 42px;
-            left: 23px;
-            top: 22px;
+            width: 18px;
+            height: 34px;
+            left: 19px;
+            top: 19px;
             border-radius: 50%;
             background: rgba(255, 255, 255, 0.45);
             transform: rotate(30deg);
@@ -2800,39 +2806,48 @@ function ensureArcheryLotteryStyles() {
         }
         @media (max-width: 760px) {
             .archery-lottery-stage {
-                padding: 18px 12px;
-                justify-content: flex-start;
+                padding: 12px 8px;
+                justify-content: center;
             }
             .archery-lottery-field {
                 width: 96vw;
-                height: 72vh;
-                min-height: 520px;
+                height: calc(100vh - 108px);
+                min-height: 0;
+                max-height: 560px;
             }
             .archery-bow {
-                left: -6px;
-                width: 76px;
-                height: 220px;
+                left: 2px;
+                width: 58px;
+                height: 166px;
+            }
+            .archery-bow-string {
+                top: 10px;
+                bottom: 10px;
+                right: 14px;
+            }
+            .archery-bow.is-drawn .archery-bow-string {
+                transform: translateX(-20px);
             }
             .archery-eggs-area {
-                left: 18%;
-                right: 2%;
+                left: 72px;
+                right: 8px;
                 top: 8%;
-                bottom: 18%;
-                grid-template-columns: repeat(auto-fit, minmax(82px, 1fr));
-                grid-auto-rows: minmax(96px, 1fr);
-                gap: 10px;
+                bottom: 20%;
+                grid-template-columns: repeat(auto-fit, minmax(68px, 1fr));
+                grid-auto-rows: minmax(78px, 1fr);
+                gap: 7px;
             }
             .archery-egg {
-                width: 78px;
-                height: 100px;
-                padding: 16px 9px 12px;
+                width: 60px;
+                height: 78px;
+                padding: 12px 7px 9px;
             }
             .archery-egg-name {
-                max-width: 64px;
-                font-size: 12px !important;
+                max-width: 50px;
+                font-size: 10px !important;
             }
             .archery-arrow {
-                width: 128px;
+                width: 112px;
             }
             .archery-result-panel {
                 left: 12px;

@@ -983,8 +983,8 @@ app.post('/api/players', (req, res) => {
         fs.writeFileSync(PLAYERS_FILE, JSON.stringify(players, null, 2));
         syncPendingLotteriesWithPlayers(players);
 
-        // 自动提交到 GitHub（5秒防抖）
-        debouncedCommit('更新玩家数据');
+        // 用户数据写入后立即后台同步，失败会持续重试。
+        debouncedCommit('更新玩家数据', 0);
 
         res.json({ success: true });
     } catch (error) {
@@ -1010,8 +1010,8 @@ app.post('/api/teams', (req, res) => {
         const teams = req.body;
         fs.writeFileSync(TEAMS_FILE, JSON.stringify(teams, null, 2));
 
-        // 自动提交到 GitHub（5秒防抖）
-        debouncedCommit('更新配队数据');
+        // 用户数据写入后立即后台同步，失败会持续重试。
+        debouncedCommit('更新配队数据', 0);
 
         res.json({ success: true });
     } catch (error) {
