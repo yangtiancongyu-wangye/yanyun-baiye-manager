@@ -2068,7 +2068,7 @@ function renderArcheryEggLotteryAnimation(container, allPlayers, winners, prizes
 
     const title = document.createElement('div');
     title.className = 'archery-lottery-title';
-    title.textContent = '百业飞羽定魁';
+    title.textContent = '加州和鸣';
     header.appendChild(title);
 
     const subtitle = document.createElement('div');
@@ -2113,6 +2113,10 @@ function renderArcheryEggLotteryAnimation(container, allPlayers, winners, prizes
     const sfx = createArcherySfx();
     const visiblePlayers = buildVisibleLotteryPlayers(allPlayers, winners);
     const eggMap = new Map();
+    const cyclingEggs = [];
+    let cycleTimer = null;
+    let cycleIndex = 0;
+    const displayQueue = buildPlayerDisplayQueue(allPlayers);
 
     visiblePlayers.forEach((playerId, index) => {
         const egg = document.createElement('div');
@@ -2131,11 +2135,14 @@ function renderArcheryEggLotteryAnimation(container, allPlayers, winners, prizes
         egg.appendChild(name);
 
         eggsArea.appendChild(egg);
-        if (!eggMap.has(playerId)) {
+        if (winners.includes(playerId) && !eggMap.has(playerId)) {
             eggMap.set(playerId, egg);
+        } else {
+            cyclingEggs.push({ egg, name });
         }
     });
 
+    startEggNameCycling();
     requestAnimationFrame(() => runArrowSequence(0));
 
     function runArrowSequence(winnerIndex) {
@@ -2148,8 +2155,8 @@ function renderArcheryEggLotteryAnimation(container, allPlayers, winners, prizes
         const prizeName = prizes[winnerIndex] || `奖品${winnerIndex + 1}`;
         const targetEgg = eggMap.get(winner);
 
-        title.textContent = prizeName;
-        subtitle.textContent = `第 ${winnerIndex + 1} 箭正在寻找目标`;
+        title.textContent = '加州和鸣';
+        subtitle.textContent = `第 ${winnerIndex + 1} 箭 · ${prizeName} 正在寻找目标`;
 
         if (!targetEgg) {
             runArrowSequence(winnerIndex + 1);
@@ -2161,12 +2168,11 @@ function renderArcheryEggLotteryAnimation(container, allPlayers, winners, prizes
             egg.classList.remove('is-aimed', 'is-target');
         });
 
-        const sweepList = buildSweepList(visiblePlayers, winner);
+        const sweepTargets = buildSweepTargets(targetEgg);
         let sweepIndex = 0;
 
         const sweepTimer = setInterval(() => {
-            const aimedPlayer = sweepList[sweepIndex % sweepList.length];
-            const aimedEgg = eggMap.get(aimedPlayer);
+            const aimedEgg = sweepTargets[sweepIndex % sweepTargets.length];
             eggsArea.querySelectorAll('.archery-egg.is-aimed').forEach(egg => egg.classList.remove('is-aimed'));
             if (aimedEgg) aimedEgg.classList.add('is-aimed');
             sweepIndex++;
@@ -2292,7 +2298,9 @@ function renderArcheryEggLotteryAnimation(container, allPlayers, winners, prizes
     }
 
     function showFinalResults() {
-        title.textContent = '中奖名单';
+        stopEggNameCycling();
+        sfx.hen();
+        title.textContent = '加州和鸣';
         subtitle.textContent = '飞羽已定，恭喜以下玩家';
         arrow.style.opacity = '0';
         field.classList.add('showing-final');
@@ -2351,10 +2359,10 @@ function renderArcheryEggLotteryAnimation(container, allPlayers, winners, prizes
         setTimeout(() => burst.remove(), 1250);
     }
 
-    function buildSweepList(players, winner) {
-        const shuffled = [...players].sort(() => Math.random() - 0.5);
-        const withoutWinner = shuffled.filter(player => player !== winner);
-        return [...withoutWinner.slice(0, 20), winner];
+    function buildSweepTargets(targetEgg) {
+        const eggs = Array.from(eggsArea.querySelectorAll('.archery-egg'));
+        const shuffled = eggs.filter(egg => egg !== targetEgg).sort(() => Math.random() - 0.5);
+        return [...shuffled.slice(0, 16), targetEgg];
     }
 
     function buildVisibleLotteryPlayers(players, selectedWinners) {
@@ -2363,8 +2371,58 @@ function renderArcheryEggLotteryAnimation(container, allPlayers, winners, prizes
         const nonWinners = uniquePlayers.filter(player => !winnerSet.has(player)).sort(() => Math.random() - 0.5);
         const viewportWidth = window.innerWidth || document.documentElement.clientWidth || 1200;
         const maxVisible = Math.max(selectedWinners.length, Math.min(viewportWidth <= 760 ? 12 : 24, uniquePlayers.length));
-        const fillerCount = Math.max(0, maxVisible - selectedWinners.length);
-        return [...selectedWinners, ...nonWinners.slice(0, fillerCount)].sort(() => Math.random() - 0.5);
+        const visible = new Array(maxVisible).fill(null);
+        selectedWinners.forEach((winner, index) => {
+            const slot = Math.min(maxVisible - 1, Math.round(((index + 1) * maxVisible) / (selectedWinners.length + 1)));
+            let targetSlot = slot;
+            while (visible[targetSlot] && targetSlot < maxVisible - 1) targetSlot++;
+            while (visible[targetSlot] && targetSlot > 0) targetSlot--;
+            visible[targetSlot] = winner;
+        });
+
+        let fillerIndex = 0;
+        for (let i = 0; i < visible.length; i++) {
+            if (!visible[i]) {
+                visible[i] = nonWinners[fillerIndex % Math.max(1, nonWinners.length)] || selectedWinners[i % selectedWinners.length];
+                fillerIndex++;
+            }
+        }
+
+        return visible;
+    }
+
+    function buildPlayerDisplayQueue(players) {
+        const uniquePlayers = Array.from(new Set(players));
+        if (uniquePlayers.length === 0) return [''];
+        return [...uniquePlayers].sort(() => Math.random() - 0.5);
+    }
+
+    function startEggNameCycling() {
+        if (cyclingEggs.length === 0 || displayQueue.length === 0) return;
+
+        cycleTimer = setInterval(() => {
+            const updatesPerTick = Math.max(1, Math.ceil(cyclingEggs.length / 3));
+            for (let i = 0; i < updatesPerTick; i++) {
+                const item = cyclingEggs[(cycleIndex + i) % cyclingEggs.length];
+                const playerId = displayQueue[(cycleIndex + i) % displayQueue.length];
+                if (!item || item.egg.classList.contains('is-winner')) continue;
+
+                item.egg.dataset.playerId = playerId;
+                item.name.textContent = playerId;
+                item.name.style.fontSize = getEggNameFontSize(playerId);
+                item.egg.classList.remove('is-name-flip');
+                void item.egg.offsetWidth;
+                item.egg.classList.add('is-name-flip');
+            }
+            cycleIndex = (cycleIndex + updatesPerTick) % Math.max(1, displayQueue.length);
+        }, 180);
+    }
+
+    function stopEggNameCycling() {
+        if (cycleTimer) {
+            clearInterval(cycleTimer);
+            cycleTimer = null;
+        }
     }
 
     function getEggNameFontSize(name) {
@@ -2454,6 +2512,14 @@ function renderArcheryEggLotteryAnimation(container, allPlayers, winners, prizes
                 noise({ duration: 0.42, gain: 0.14, filter: 520 });
                 tone({ frequency: 130, endFrequency: 60, duration: 0.36, type: 'square', gain: 0.08 });
                 tone({ frequency: 880, endFrequency: 440, duration: 0.18, type: 'triangle', gain: 0.04, delay: 0.02 });
+            },
+            hen() {
+                noise({ duration: 0.16, gain: 0.11, filter: 1200 });
+                tone({ frequency: 520, endFrequency: 760, duration: 0.12, type: 'square', gain: 0.045, delay: 0.02 });
+                tone({ frequency: 760, endFrequency: 430, duration: 0.16, type: 'square', gain: 0.045, delay: 0.17 });
+                noise({ duration: 0.18, gain: 0.12, filter: 950, delay: 0.34 });
+                tone({ frequency: 620, endFrequency: 820, duration: 0.11, type: 'square', gain: 0.04, delay: 0.36 });
+                tone({ frequency: 180, endFrequency: 90, duration: 0.3, type: 'triangle', gain: 0.07, delay: 0.58 });
             }
         };
     }
@@ -2480,6 +2546,11 @@ function ensureArcheryLotteryStyles() {
         @keyframes eggAim {
             0%, 100% { box-shadow: 0 12px 28px rgba(0, 0, 0, 0.28), 0 0 0 0 rgba(213, 70, 54, 0.16); }
             50% { box-shadow: 0 16px 36px rgba(0, 0, 0, 0.34), 0 0 0 12px rgba(213, 70, 54, 0.26); }
+        }
+        @keyframes eggNameFlip {
+            0% { filter: brightness(1); transform: translateY(0) scale(1); }
+            45% { filter: brightness(1.28); transform: translateY(-6px) scale(1.05); }
+            100% { filter: brightness(1); transform: translateY(0) scale(1); }
         }
         @keyframes eggHit {
             0% { transform: scale(1) rotate(0); }
@@ -2792,6 +2863,9 @@ function ensureArcheryLotteryStyles() {
             opacity: 1 !important;
             z-index: 12;
             transform: translateY(0) scale(1.06);
+        }
+        .archery-egg.is-name-flip {
+            animation: eggNameFlip 0.18s ease-out;
         }
         .archery-egg.is-hit {
             animation: eggHit 0.5s ease forwards;
