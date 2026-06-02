@@ -7,7 +7,7 @@ const fs = require('fs');
 const sharp = require('sharp');
 const Tesseract = require('tesseract.js');
 const { initializeData } = require('./init-data');
-const { pullData, debouncedCommit } = require('./git-storage');
+const { pullData, debouncedCommit, getSyncStatus } = require('./git-storage');
 
 function generateUid() {
     return 'u' + Math.random().toString(36).substring(2, 11);
@@ -986,7 +986,7 @@ app.post('/api/players', (req, res) => {
         // 用户数据写入后立即后台同步，失败会持续重试。
         debouncedCommit('更新玩家数据', 0);
 
-        res.json({ success: true });
+        res.json({ success: true, sync: getSyncStatus() });
     } catch (error) {
         console.error('保存玩家数据失败:', error);
         res.json({ success: false, error: error.message });
@@ -1013,7 +1013,7 @@ app.post('/api/teams', (req, res) => {
         // 用户数据写入后立即后台同步，失败会持续重试。
         debouncedCommit('更新配队数据', 0);
 
-        res.json({ success: true });
+        res.json({ success: true, sync: getSyncStatus() });
     } catch (error) {
         console.error('保存配队数据失败:', error);
         res.json({ success: false, error: error.message });
@@ -1044,11 +1044,15 @@ app.post('/api/lotteries', (req, res) => {
         // 先让运行中的服务保存成功并继续抽奖，远端 GitHub 同步立即在后台执行并失败重试。
         debouncedCommit('更新抽奖数据', 0);
 
-        res.json({ success: true });
+        res.json({ success: true, sync: getSyncStatus() });
     } catch (error) {
         console.error('保存抽奖数据失败:', error);
         res.json({ success: false, error: error.message });
     }
+});
+
+app.get('/api/sync-status', (req, res) => {
+    res.json(getSyncStatus());
 });
 
 // 健康检查

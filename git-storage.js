@@ -78,9 +78,19 @@ let commitTimer = null;
 let pendingMessage = null;
 let retryTimer = null;
 let retryAttempts = 0;
+let syncStatus = {
+    pending: false,
+    retryAttempts: 0,
+    lastSuccessAt: null,
+    lastErrorAt: null,
+    lastError: null,
+    lastMessage: null
+};
 
 function debouncedCommit(message, delay = 1000) {
     pendingMessage = message;
+    syncStatus.pending = true;
+    syncStatus.lastMessage = message;
     if (commitTimer) {
         clearTimeout(commitTimer);
     }
@@ -100,15 +110,31 @@ async function runReliableCommit(message) {
     if (result.success) {
         pendingMessage = null;
         retryAttempts = 0;
+        syncStatus.pending = false;
+        syncStatus.retryAttempts = 0;
+        syncStatus.lastSuccessAt = new Date().toISOString();
+        syncStatus.lastError = null;
         return;
     }
 
     retryAttempts++;
+    syncStatus.pending = true;
+    syncStatus.retryAttempts = retryAttempts;
+    syncStatus.lastErrorAt = new Date().toISOString();
+    syncStatus.lastError = result.error || '未知同步失败';
     const retryDelay = Math.min(60000, 5000 * retryAttempts);
     console.warn(`数据保存到 GitHub 失败，${Math.round(retryDelay / 1000)} 秒后重试第 ${retryAttempts} 次`);
     retryTimer = setTimeout(() => {
         runReliableCommit(pendingMessage || message);
     }, retryDelay);
+}
+
+function getSyncStatus() {
+    return {
+        ...syncStatus,
+        hasScheduledCommit: Boolean(commitTimer),
+        hasScheduledRetry: Boolean(retryTimer)
+    };
 }
 
 // 进程退出前立即执行挂起的提交，防止重新部署时数据丢失
@@ -144,5 +170,6 @@ process.on('SIGINT', () => { flushPendingCommit(); process.exit(0); });
 module.exports = {
     commitData,
     pullData,
-    debouncedCommit
+    debouncedCommit,
+    getSyncStatus
 };

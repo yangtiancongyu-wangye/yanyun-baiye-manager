@@ -3,6 +3,7 @@ let players = [];
 let teams = {};
 let lotteries = [];
 let currentBattleDate = new Date().toISOString().split('T')[0];
+let syncWarningTimer = null;
 
 // DOM元素
 const navBtns = document.querySelectorAll('.nav-btn');
@@ -33,17 +34,21 @@ async function loadDataFromServer() {
     }
 }
 
-// 保存配队数据到服务器
-async function saveTeams() {
-    try {
-        await fetch('/api/teams', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(teams)
-        });
-    } catch (error) {
-        console.error('保存配队数据失败:', error);
+function scheduleSyncStatusCheck() {
+    if (syncWarningTimer) {
+        clearTimeout(syncWarningTimer);
     }
+    syncWarningTimer = setTimeout(async () => {
+        try {
+            const response = await fetch('/api/sync-status');
+            const status = await response.json();
+            if (status.lastError && status.pending) {
+                alert(`数据已暂存到当前服务，但远端同步失败，刷新或部署可能丢失：${status.lastError}`);
+            }
+        } catch (error) {
+            console.error('检查数据同步状态失败:', error);
+        }
+    }, 4000);
 }
 
 // 初始化
@@ -332,6 +337,7 @@ async function savePlayers() {
         if (!result.success) {
             throw new Error(result.error || '保存失败');
         }
+        scheduleSyncStatusCheck();
         return true;
     } catch (error) {
         console.error('保存玩家数据失败:', error);
@@ -801,12 +807,24 @@ function updateMemberPlan(brigade, squadIndex, memberIndex, field, value) {
     saveTeams();
 }
 
-function saveTeams() {
-    fetch('/api/teams', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(teams)
-    }).catch(error => console.error('保存配队数据失败:', error));
+async function saveTeams() {
+    try {
+        const response = await fetch('/api/teams', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(teams)
+        });
+        const result = await response.json();
+        if (!result.success) {
+            throw new Error(result.error || '保存失败');
+        }
+        scheduleSyncStatusCheck();
+        return true;
+    } catch (error) {
+        console.error('保存配队数据失败:', error);
+        alert('保存配队数据失败：' + error.message);
+        return false;
+    }
 }
 
 // 拖拽功能
@@ -1581,6 +1599,7 @@ async function saveLotteries() {
         if (!result.success) {
             throw new Error(result.error || '保存失败');
         }
+        scheduleSyncStatusCheck();
         return true;
     } catch (error) {
         console.error('保存抽奖数据失败:', error);
