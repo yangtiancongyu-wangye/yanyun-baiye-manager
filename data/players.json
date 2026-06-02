@@ -2,7 +2,7 @@
   {
     "id": "飞天大蟑螂",
     "professions": [
-      "陌刀"
+      "尘"
     ],
     "notes": "",
     "uid": "uuqgl45yvj"
@@ -326,45 +326,5 @@
     ],
     "notes": "测试",
     "uid": "u9dxqlpa7y"
-  },
-  {
-    "id": "半夏寺下",
-    "professions": [
-      "双扇"
-    ],
-    "notes": "",
-    "uid": "ufp83ldce5"
-  },
-  {
-    "id": "苏慕",
-    "professions": [
-      "纯奶"
-    ],
-    "notes": "",
-    "uid": "udcbu4oa0n"
-  },
-  {
-    "id": "麟零",
-    "professions": [
-      "尘"
-    ],
-    "notes": "",
-    "uid": "uv5ilcwkwb"
-  },
-  {
-    "id": "月季歌",
-    "professions": [
-      "无名"
-    ],
-    "notes": "",
-    "uid": "uajnwbmguu"
-  },
-  {
-    "id": "赵更新",
-    "professions": [
-      "尘"
-    ],
-    "notes": "",
-    "uid": "uvq3ucc8qv"
   }
 ]
