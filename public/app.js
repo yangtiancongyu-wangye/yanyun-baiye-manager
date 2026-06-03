@@ -1720,7 +1720,6 @@ function openLotteryModal(lotteryIndex = null) {
         submitBtn.onclick = null;
         form.querySelectorAll('input, select').forEach(el => el.disabled = false);
         updatePrizesInputs(1);
-        getTalentPlayerIds().forEach(id => selectedLotteryPlayers.add(id));
     }
 
     renderLotteryPlayerList();
