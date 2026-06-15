@@ -2095,8 +2095,9 @@ function calculateWinnersWithHistory(playerIds, winnerCount) {
     return winners;
 }
 
-function renderArcheryEggLotteryAnimation(container, allPlayers, winners, prizes, onComplete) {
+function renderArcheryEggLotteryAnimation(container, allPlayers, winners, prizes, onComplete, options = {}) {
     ensureArcheryLotteryStyles();
+    const issue = options.issue || getLotteryIssueDate();
 
     const stage = document.createElement('div');
     stage.className = 'archery-lottery-stage';
@@ -2108,12 +2109,12 @@ function renderArcheryEggLotteryAnimation(container, allPlayers, winners, prizes
 
     const title = document.createElement('div');
     title.className = 'archery-lottery-title';
-    title.textContent = '加州和鸣';
+    title.textContent = '加州大乐透';
     header.appendChild(title);
 
     const subtitle = document.createElement('div');
     subtitle.className = 'archery-lottery-subtitle';
-    subtitle.textContent = '箭过群名，落处即为本轮中奖玩家';
+    subtitle.textContent = `${issue}期`;
     header.appendChild(subtitle);
 
     const field = document.createElement('div');
@@ -2187,7 +2188,7 @@ function renderArcheryEggLotteryAnimation(container, allPlayers, winners, prizes
     let cyclePlayerIndex = 0;
     let lastTargetRegion = null;
     let targetBag = [];
-    const shownPlayerIds = new Set();
+    const playerExposureSlots = new Map();
     const uniquePlayerIds = Array.from(new Set(allPlayers));
 
     visiblePlayers.forEach((playerId, index) => {
@@ -2207,13 +2208,13 @@ function renderArcheryEggLotteryAnimation(container, allPlayers, winners, prizes
         egg.appendChild(name);
 
         eggsArea.appendChild(egg);
-        markPlayerShown(playerId);
         const item = { egg, name, slotIndex: index, isChanging: false, pendingTimer: null };
         eggItems.push(item);
         eggItemMap.set(egg, item);
+        markPlayerShown(playerId, index);
     });
 
-    const displayQueue = buildPlayerDisplayQueue(allPlayers, shownPlayerIds);
+    const displayQueue = buildPlayerDisplayQueue(allPlayers);
     startEggNameCycling();
     requestAnimationFrame(() => runArrowSequence(0));
 
@@ -2227,8 +2228,8 @@ function renderArcheryEggLotteryAnimation(container, allPlayers, winners, prizes
         const prizeName = prizes[winnerIndex] || `奖品${winnerIndex + 1}`;
         const targetEgg = chooseTargetEgg();
 
-        title.textContent = '加州和鸣';
-        subtitle.textContent = `第 ${winnerIndex + 1} 箭 · ${prizeName} 正在寻找目标`;
+        title.textContent = '加州大乐透';
+        subtitle.textContent = `${issue}期 · 第 ${winnerIndex + 1} 箭 · ${prizeName} 正在寻找目标`;
 
         if (!targetEgg) {
             runArrowSequence(winnerIndex + 1);
@@ -2255,16 +2256,15 @@ function renderArcheryEggLotteryAnimation(container, allPlayers, winners, prizes
             eggsArea.querySelectorAll('.archery-egg.is-aimed').forEach(egg => egg.classList.remove('is-aimed'));
             targetEgg.classList.add('is-aimed', 'is-target');
             targetEgg.style.opacity = '1';
-            targetEgg.classList.add('is-locked-target');
-            revealWinnerOnEgg(targetEgg, winner);
 
             setTimeout(() => {
                 shootArrowAt(targetEgg, () => {
-                    targetEgg.classList.remove('is-aimed', 'is-locked-target');
+                    targetEgg.classList.remove('is-aimed');
                     targetEgg.classList.add('is-hit', 'is-winner', 'is-target');
+                    revealWinnerOnEgg(targetEgg, winner);
                     createImpactBurst(targetEgg);
                     addResultChip(prizeName, winner);
-                    subtitle.textContent = `射中 ${winner}`;
+                    subtitle.textContent = `${issue}期 · 射中 ${winner}`;
 
                     setTimeout(() => {
                         runArrowSequence(winnerIndex + 1);
@@ -2290,6 +2290,8 @@ function renderArcheryEggLotteryAnimation(container, allPlayers, winners, prizes
     }
 
     function shootArrowAt(targetEgg, done) {
+        const drawHoldDuration = 1060;
+        const arrowFlightDuration = 3200;
         const fieldRect = field.getBoundingClientRect();
         const eggRect = targetEgg.getBoundingClientRect();
         const targetX = eggRect.left - fieldRect.left + eggRect.width * 0.46;
@@ -2337,14 +2339,15 @@ function renderArcheryEggLotteryAnimation(container, allPlayers, winners, prizes
                     chargeRing.classList.add('is-release');
                     aimLine.classList.remove('is-visible');
                     arrowTrail.classList.add('is-flying');
-                    arrowTrail.style.transition = 'width 1.8s cubic-bezier(0.18, 0.88, 0.2, 1), opacity 1.8s ease';
+                    arrowTrail.style.animationDuration = `${arrowFlightDuration}ms`;
+                    arrowTrail.style.transition = `width ${arrowFlightDuration}ms cubic-bezier(0.18, 0.88, 0.2, 1), opacity ${arrowFlightDuration}ms ease`;
                     arrowTrail.style.width = `${Math.max(80, Math.hypot(distanceX, distanceY) - 30)}px`;
-                    arrow.style.transition = 'left 1.8s cubic-bezier(0.18, 0.88, 0.2, 1), top 1.8s cubic-bezier(0.18, 0.88, 0.2, 1), transform 1.8s cubic-bezier(0.18, 0.88, 0.2, 1), filter 1.8s ease';
+                    arrow.style.transition = `left ${arrowFlightDuration}ms cubic-bezier(0.18, 0.88, 0.2, 1), top ${arrowFlightDuration}ms cubic-bezier(0.18, 0.88, 0.2, 1), transform ${arrowFlightDuration}ms cubic-bezier(0.18, 0.88, 0.2, 1), filter ${arrowFlightDuration}ms ease`;
                     arrow.style.left = `${finalNockX}px`;
                     arrow.style.top = `${finalNockY}px`;
                     arrow.style.transform = `translate(0, -50%) rotate(${angle}deg)`;
                     arrow.style.filter = 'drop-shadow(0 0 26px rgba(245, 196, 95, 0.95)) drop-shadow(0 0 58px rgba(213, 70, 54, 0.52))';
-                }, 820);
+                }, drawHoldDuration);
             });
         });
 
@@ -2353,10 +2356,11 @@ function renderArcheryEggLotteryAnimation(container, allPlayers, winners, prizes
             chargeRing.classList.remove('is-release');
             arrowTrail.classList.remove('is-flying');
             arrowTrail.style.transition = 'none';
+            arrowTrail.style.animationDuration = '';
             arrowTrail.style.opacity = '';
             arrow.style.filter = '';
             done();
-        }, 2680);
+        }, drawHoldDuration + arrowFlightDuration + 80);
     }
 
     function resetArrow() {
@@ -2393,8 +2397,8 @@ function renderArcheryEggLotteryAnimation(container, allPlayers, winners, prizes
     function showFinalResults() {
         stopEggNameCycling();
         sfx.hen();
-        title.textContent = '加州和鸣';
-        subtitle.textContent = '飞羽已定，恭喜以下玩家';
+        title.textContent = '加州大乐透';
+        subtitle.textContent = `${issue}期`;
         arrow.style.opacity = '0';
         field.classList.add('showing-final');
 
@@ -2403,14 +2407,16 @@ function renderArcheryEggLotteryAnimation(container, allPlayers, winners, prizes
 
         winners.forEach((winner, index) => {
             const card = document.createElement('div');
-            card.className = 'archery-final-card';
+            card.className = 'archery-final-card lottery-cyber-result-card';
             card.style.setProperty('--final-delay', `${index * 0.12}s`);
 
             const prize = document.createElement('span');
+            prize.className = 'lottery-cyber-result-prize';
             prize.textContent = prizes[index] || `奖品${index + 1}`;
             card.appendChild(prize);
 
             const name = document.createElement('strong');
+            name.className = 'lottery-cyber-result-winner';
             name.textContent = winner;
             name.style.fontSize = getFinalWinnerFontSize(winner);
             card.appendChild(name);
@@ -2440,8 +2446,40 @@ function renderArcheryEggLotteryAnimation(container, allPlayers, winners, prizes
         targetEgg.classList.add('is-cracked');
         sfx.hit();
 
+        const orb = document.createElement('div');
+        orb.className = 'archery-prize-orb';
+        [
+            ['18%', '24%', '24px', '-24deg', '#7fd6c2', '#7389d8'],
+            ['54%', '21%', '19px', '18deg', '#8cd8f0', '#756ed0'],
+            ['69%', '56%', '27px', '34deg', '#67c7e8', '#4d76c9'],
+            ['27%', '68%', '21px', '-14deg', '#f2a7d2', '#7ed2e9'],
+            ['48%', '77%', '14px', '24deg', '#9be2f0', '#e89acb']
+        ].forEach(([left, top, size, rotation, colorA, colorB]) => {
+            const patch = document.createElement('i');
+            patch.style.setProperty('--patch-left', left);
+            patch.style.setProperty('--patch-top', top);
+            patch.style.setProperty('--patch-size', size);
+            patch.style.setProperty('--patch-rotate', rotation);
+            patch.style.setProperty('--patch-color-a', colorA);
+            patch.style.setProperty('--patch-color-b', colorB);
+            orb.appendChild(patch);
+        });
+        burst.appendChild(orb);
+
+        for (let i = 0; i < 10; i++) {
+            const shard = document.createElement('b');
+            const angle = -Math.PI * 0.88 + (Math.PI * 1.76 * i) / 9;
+            const distance = 42 + Math.random() * 54;
+            shard.style.setProperty('--shell-x', `${Math.cos(angle) * distance}px`);
+            shard.style.setProperty('--shell-y', `${Math.sin(angle) * distance - 12}px`);
+            shard.style.setProperty('--shell-rotate', `${Math.random() * 120 - 60}deg`);
+            shard.style.animationDelay = `${Math.random() * 0.06}s`;
+            burst.appendChild(shard);
+        }
+
         for (let i = 0; i < 34; i++) {
             const spark = document.createElement('span');
+            spark.className = 'archery-impact-spark';
             const angle = (Math.PI * 2 * i) / 34;
             const distance = 72 + Math.random() * 92;
             spark.style.setProperty('--spark-x', `${Math.cos(angle) * distance}px`);
@@ -2450,7 +2488,7 @@ function renderArcheryEggLotteryAnimation(container, allPlayers, winners, prizes
             burst.appendChild(spark);
         }
 
-        setTimeout(() => burst.remove(), 1250);
+        setTimeout(() => burst.remove(), 1680);
     }
 
     function buildSweepTargets(targetEgg) {
@@ -2495,23 +2533,21 @@ function renderArcheryEggLotteryAnimation(container, allPlayers, winners, prizes
         return visible;
     }
 
-    function buildPlayerDisplayQueue(players, shownPlayers = new Set()) {
+    function buildPlayerDisplayQueue(players) {
         const uniquePlayers = Array.from(new Set(players));
         if (uniquePlayers.length === 0) return [''];
 
-        const unseenPlayers = uniquePlayers.filter(player => !shownPlayers.has(player)).sort(() => Math.random() - 0.5);
-        const cycledPlayers = [...uniquePlayers].sort(() => Math.random() - 0.5);
-        return [...unseenPlayers, ...cycledPlayers];
+        return shuffleArray(uniquePlayers);
     }
 
     function startEggNameCycling() {
         if (eggItems.length === 0 || displayQueue.length === 0) return;
 
         cycleTimer = setInterval(() => {
-            const updatesPerTick = Math.max(1, Math.ceil(eggItems.length / 5));
+            const updatesPerTick = Math.max(1, Math.ceil(eggItems.length / 3));
             for (let i = 0; i < updatesPerTick; i++) {
                 const item = eggItems[(cycleEggIndex + i) % eggItems.length];
-                if (!item || item.isChanging || item.egg.classList.contains('is-winner') || item.egg.classList.contains('is-locked-target')) continue;
+                if (!item || item.isChanging) continue;
 
                 const playerId = getNextDisplayPlayer(item.slotIndex);
                 updateEggName(item, playerId);
@@ -2525,6 +2561,13 @@ function renderArcheryEggLotteryAnimation(container, allPlayers, winners, prizes
             clearInterval(cycleTimer);
             cycleTimer = null;
         }
+
+        eggItems.forEach(item => {
+            if (!item?.pendingTimer) return;
+            clearTimeout(item.pendingTimer);
+            item.pendingTimer = null;
+            item.isChanging = false;
+        });
     }
 
     function getNextDisplayPlayer(slotIndex) {
@@ -2533,6 +2576,21 @@ function renderArcheryEggLotteryAnimation(container, allPlayers, winners, prizes
         }
 
         const neighborNames = getNeighborNames(slotIndex);
+        const underexposedPlayers = shuffleArray(uniquePlayerIds.filter(playerId => {
+            const slots = playerExposureSlots.get(playerId);
+            return (!slots || slots.size < getRequiredExposureCount()) && !slots?.has(slotIndex);
+        }));
+
+        for (const playerId of underexposedPlayers) {
+            if (!neighborNames.has(playerId)) {
+                return playerId;
+            }
+        }
+
+        if (underexposedPlayers.length > 0) {
+            return underexposedPlayers[0];
+        }
+
         for (let attempt = 0; attempt < displayQueue.length; attempt++) {
             const playerId = displayQueue[cyclePlayerIndex % displayQueue.length];
             cyclePlayerIndex++;
@@ -2631,7 +2689,7 @@ function renderArcheryEggLotteryAnimation(container, allPlayers, winners, prizes
             item.egg.dataset.playerId = playerId;
             item.name.textContent = playerId;
             item.name.style.fontSize = getEggNameFontSize(playerId);
-            if (markShown) markPlayerShown(playerId);
+            if (markShown) markPlayerShown(playerId, item.slotIndex);
         };
 
         item.name.classList.remove('is-name-out', 'is-name-in');
@@ -2682,12 +2740,23 @@ function renderArcheryEggLotteryAnimation(container, allPlayers, winners, prizes
         return candidates[seed % candidates.length];
     }
 
-    function markPlayerShown(playerId) {
-        if (playerId) shownPlayerIds.add(playerId);
+    function markPlayerShown(playerId, slotIndex) {
+        if (!playerId || !Number.isInteger(slotIndex)) return;
+
+        if (!playerExposureSlots.has(playerId)) {
+            playerExposureSlots.set(playerId, new Set());
+        }
+
+        playerExposureSlots.get(playerId).add(slotIndex);
     }
 
     function allPlayersShown() {
-        return uniquePlayerIds.every(playerId => shownPlayerIds.has(playerId));
+        const requiredExposureCount = getRequiredExposureCount();
+        return uniquePlayerIds.every(playerId => (playerExposureSlots.get(playerId)?.size || 0) >= requiredExposureCount);
+    }
+
+    function getRequiredExposureCount() {
+        return Math.min(2, Math.max(1, eggItems.length));
     }
 
     function getEggNameFontSize(name) {
@@ -2917,9 +2986,205 @@ function ensureArcheryLotteryStyles() {
             from { opacity: 1; transform: translate(-50%, -50%) scale(1); }
             to { opacity: 0; transform: translate(calc(-50% + var(--spark-x)), calc(-50% + var(--spark-y))) scale(0.2); }
         }
+        @keyframes shellShardFly {
+            0% { opacity: 1; transform: translate(-50%, -50%) scale(0.64) rotate(0); }
+            100% { opacity: 0; transform: translate(calc(-50% + var(--shell-x)), calc(-50% + var(--shell-y))) scale(0.92) rotate(var(--shell-rotate)); }
+        }
+        @keyframes prizeOrbPop {
+            0% { opacity: 0; transform: translate(-50%, -38%) scale(0.16) rotate(-18deg); filter: blur(5px) brightness(1.55); }
+            24% { opacity: 1; transform: translate(-50%, -112%) scale(1.18) rotate(7deg); filter: blur(0) brightness(1.18); }
+            58% { opacity: 1; transform: translate(-50%, -100%) scale(1) rotate(-4deg); filter: blur(0) brightness(1.04); }
+            100% { opacity: 0; transform: translate(-50%, -126%) scale(0.9) rotate(9deg); filter: blur(1px) brightness(1.1); }
+        }
+        @keyframes orbSheen {
+            0% { transform: translate(-32%, -34%) rotate(-18deg); opacity: 0.38; }
+            50% { opacity: 0.72; }
+            100% { transform: translate(24%, 18%) rotate(-18deg); opacity: 0.18; }
+        }
         @keyframes finalPop {
             from { opacity: 0; transform: translateY(22px) scale(0.94); }
             to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        @keyframes cyberGridDrift {
+            0% { transform: translateY(0); opacity: 0.42; }
+            100% { transform: translateY(42px); opacity: 0.72; }
+        }
+        @keyframes cyberPanelPulse {
+            0%, 100% { box-shadow: 0 0 0 1px rgba(101, 241, 255, 0.4), 0 0 42px rgba(101, 241, 255, 0.2), 0 0 90px rgba(255, 46, 154, 0.13); }
+            50% { box-shadow: 0 0 0 1px rgba(255, 213, 94, 0.56), 0 0 58px rgba(101, 241, 255, 0.32), 0 0 120px rgba(255, 46, 154, 0.22); }
+        }
+        @keyframes cyberLaunch {
+            0% { opacity: 1; transform: scale(1); filter: brightness(1); }
+            100% { opacity: 0; transform: scale(1.04); filter: brightness(1.5) blur(8px); }
+        }
+        @keyframes cyberButtonGlow {
+            0%, 100% { filter: drop-shadow(0 0 16px rgba(101, 241, 255, 0.45)); }
+            50% { filter: drop-shadow(0 0 28px rgba(255, 46, 154, 0.62)); }
+        }
+        .lottery-cyber-stage {
+            width: 100%;
+            height: 100vh;
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-sizing: border-box;
+            padding: clamp(18px, 4vw, 46px);
+            background:
+                radial-gradient(circle at 18% 18%, rgba(255, 46, 154, 0.24), transparent 28%),
+                radial-gradient(circle at 82% 20%, rgba(101, 241, 255, 0.22), transparent 30%),
+                radial-gradient(circle at 52% 88%, rgba(255, 213, 94, 0.14), transparent 30%),
+                linear-gradient(135deg, #080917 0%, #101024 46%, #07151e 100%);
+            color: #f8fbff;
+            font-family: 'Microsoft YaHei', 'Segoe UI', sans-serif;
+        }
+        .lottery-cyber-stage::before,
+        .lottery-cyber-stage::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+        }
+        .lottery-cyber-stage::before {
+            background:
+                linear-gradient(90deg, transparent 0 48%, rgba(101, 241, 255, 0.26) 49% 50%, transparent 51% 100%),
+                repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.04) 0 1px, transparent 1px 28px);
+            mask-image: linear-gradient(180deg, transparent, #000 16%, #000 84%, transparent);
+        }
+        .lottery-cyber-stage::after {
+            background: linear-gradient(180deg, rgba(255,255,255,0.05), transparent 18%, rgba(255,46,154,0.08) 52%, transparent);
+            mix-blend-mode: screen;
+        }
+        .lottery-cyber-stage.is-launching {
+            animation: cyberLaunch 0.52s ease forwards;
+        }
+        .lottery-cyber-grid {
+            position: absolute;
+            inset: -40px;
+            background:
+                linear-gradient(rgba(101, 241, 255, 0.12) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 46, 154, 0.12) 1px, transparent 1px);
+            background-size: 42px 42px;
+            transform: perspective(560px) rotateX(58deg) translateY(0);
+            transform-origin: center bottom;
+            animation: cyberGridDrift 1.6s linear infinite;
+            opacity: 0.5;
+        }
+        .lottery-cyber-panel {
+            width: min(760px, 92vw);
+            position: relative;
+            z-index: 2;
+            box-sizing: border-box;
+            padding: clamp(28px, 5vw, 56px);
+            border: 1px solid rgba(101, 241, 255, 0.48);
+            border-radius: 8px;
+            background:
+                linear-gradient(135deg, rgba(10, 14, 34, 0.9), rgba(8, 23, 34, 0.78)),
+                radial-gradient(circle at 20% 0%, rgba(255, 46, 154, 0.18), transparent 38%),
+                radial-gradient(circle at 84% 14%, rgba(101, 241, 255, 0.18), transparent 36%);
+            backdrop-filter: blur(10px);
+            animation: cyberPanelPulse 2.8s ease-in-out infinite;
+        }
+        .lottery-cyber-panel::before {
+            content: '';
+            position: absolute;
+            inset: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 6px;
+            pointer-events: none;
+        }
+        .lottery-cyber-kicker {
+            color: #65f1ff;
+            font-size: 13px;
+            font-weight: 800;
+            letter-spacing: 0;
+            text-shadow: 0 0 18px rgba(101, 241, 255, 0.8);
+        }
+        .lottery-cyber-title {
+            margin: 8px 0 0;
+            font-size: clamp(42px, 8vw, 82px);
+            line-height: 1;
+            letter-spacing: 0;
+            color: #fff;
+            text-shadow: 0 0 20px rgba(101, 241, 255, 0.72), 0 0 42px rgba(255, 46, 154, 0.42);
+        }
+        .lottery-cyber-subtitle {
+            margin-top: 12px;
+            color: #ffd55e;
+            font-size: clamp(20px, 3vw, 32px);
+            font-weight: 900;
+            text-shadow: 0 0 18px rgba(255, 213, 94, 0.52);
+        }
+        .lottery-cyber-divider {
+            height: 1px;
+            margin: 28px 0 22px;
+            background: linear-gradient(90deg, rgba(101, 241, 255, 0), rgba(101, 241, 255, 0.86), rgba(255, 46, 154, 0.84), rgba(255, 213, 94, 0));
+            box-shadow: 0 0 18px rgba(101, 241, 255, 0.5);
+        }
+        .lottery-cyber-prize-heading {
+            color: rgba(248, 251, 255, 0.72);
+            font-size: 15px;
+            font-weight: 800;
+            margin-bottom: 12px;
+        }
+        .lottery-cyber-prize-list {
+            display: grid;
+            gap: 10px;
+            margin-bottom: 30px;
+        }
+        .lottery-cyber-prize {
+            min-height: 58px;
+            display: grid;
+            grid-template-columns: 92px 1fr;
+            align-items: center;
+            gap: 14px;
+            padding: 12px 16px;
+            border: 1px solid rgba(101, 241, 255, 0.26);
+            border-radius: 8px;
+            background: linear-gradient(90deg, rgba(101, 241, 255, 0.1), rgba(255, 46, 154, 0.08));
+            box-shadow: inset 0 0 18px rgba(101, 241, 255, 0.07);
+        }
+        .lottery-cyber-prize span {
+            color: #65f1ff;
+            font-size: 12px;
+            font-weight: 900;
+        }
+        .lottery-cyber-prize strong {
+            min-width: 0;
+            color: #fff;
+            font-size: clamp(18px, 2.7vw, 26px);
+            line-height: 1.16;
+            overflow-wrap: anywhere;
+            text-shadow: 0 0 14px rgba(255, 255, 255, 0.3);
+        }
+        .lottery-cyber-prize.is-result {
+            grid-template-columns: 82px minmax(0, 1fr) minmax(0, 1fr);
+        }
+        .lottery-cyber-prize b {
+            min-width: 0;
+            color: #ffd55e;
+            font-size: clamp(18px, 2.5vw, 28px);
+            line-height: 1.12;
+            overflow-wrap: anywhere;
+            text-shadow: 0 0 18px rgba(255, 213, 94, 0.58);
+        }
+        .lottery-cyber-start-btn {
+            width: min(320px, 100%);
+            height: 58px;
+            border: 1px solid rgba(255, 255, 255, 0.72);
+            border-radius: 8px;
+            cursor: pointer;
+            color: #061018;
+            font-size: 23px;
+            font-weight: 1000;
+            background: linear-gradient(90deg, #65f1ff, #ffd55e 48%, #ff2e9a);
+            box-shadow: 0 0 28px rgba(101, 241, 255, 0.4), 0 0 48px rgba(255, 46, 154, 0.22);
+            animation: cyberButtonGlow 1.5s ease-in-out infinite;
+        }
+        .lottery-cyber-start-btn:disabled {
+            cursor: default;
+            opacity: 0.72;
         }
         .archery-lottery-stage {
             width: 100%;
@@ -3732,7 +3997,79 @@ function ensureArcheryLotteryStyles() {
             z-index: 10;
             pointer-events: none;
         }
-        .archery-impact-burst span {
+        .archery-prize-orb {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 92px;
+            height: 92px;
+            border-radius: 50%;
+            overflow: hidden;
+            z-index: 3;
+            background:
+                radial-gradient(circle at 27% 21%, rgba(255, 255, 255, 0.98) 0 11%, transparent 12%),
+                radial-gradient(circle at 70% 75%, rgba(202, 225, 255, 0.5), transparent 30%),
+                radial-gradient(circle at 45% 42%, rgba(136, 218, 231, 0.2), transparent 46%),
+                linear-gradient(145deg, #f9fbff 0%, #dbe7f4 54%, #eef6ff 100%);
+            border: 2px solid rgba(255, 255, 255, 0.9);
+            box-shadow:
+                0 0 0 1px rgba(136, 218, 231, 0.28),
+                0 14px 28px rgba(0, 0, 0, 0.34),
+                0 0 34px rgba(127, 214, 194, 0.56),
+                inset -16px -18px 28px rgba(102, 131, 167, 0.22),
+                inset 14px 16px 22px rgba(255, 255, 255, 0.82);
+            animation: prizeOrbPop 1.62s cubic-bezier(0.18, 0.88, 0.24, 1) forwards;
+        }
+        .archery-prize-orb::before {
+            content: '';
+            position: absolute;
+            inset: 9px 16px 50px 12px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0.12));
+            filter: blur(1px);
+            transform: rotate(-20deg);
+            z-index: 3;
+        }
+        .archery-prize-orb::after {
+            content: '';
+            position: absolute;
+            left: -28%;
+            top: -22%;
+            width: 72%;
+            height: 145%;
+            border-radius: 50%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.7), transparent);
+            animation: orbSheen 1.14s ease-out 0.12s forwards;
+            z-index: 4;
+        }
+        .archery-prize-orb i {
+            position: absolute;
+            left: var(--patch-left);
+            top: var(--patch-top);
+            width: var(--patch-size);
+            height: var(--patch-size);
+            border-radius: 50%;
+            background:
+                radial-gradient(circle at 32% 26%, rgba(255, 255, 255, 0.82), transparent 25%),
+                linear-gradient(135deg, var(--patch-color-a), var(--patch-color-b));
+            box-shadow: inset -5px -7px 9px rgba(32, 61, 118, 0.24), 0 0 10px rgba(127, 214, 194, 0.28);
+            transform: translate(-50%, -50%) rotate(var(--patch-rotate)) scaleY(0.72);
+            opacity: 0.82;
+            z-index: 2;
+        }
+        .archery-impact-burst b {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 22px;
+            height: 18px;
+            clip-path: polygon(50% 0, 100% 38%, 75% 100%, 17% 82%, 0 28%);
+            background: linear-gradient(145deg, #fff2cf, #d9a667);
+            box-shadow: inset -5px -6px 7px rgba(125, 75, 38, 0.2), 0 0 12px rgba(245, 196, 95, 0.24);
+            animation: shellShardFly 0.92s ease-out forwards;
+            z-index: 2;
+        }
+        .archery-impact-burst .archery-impact-spark {
             position: absolute;
             left: 0;
             top: 0;
@@ -3751,22 +4088,27 @@ function ensureArcheryLotteryStyles() {
             align-items: center;
             justify-content: center;
             flex-wrap: wrap;
-            gap: 18px;
+            gap: 16px;
             padding: 44px;
-            background: rgba(9, 13, 20, 0.84);
-            backdrop-filter: blur(4px);
+            background:
+                radial-gradient(circle at 18% 18%, rgba(255, 46, 154, 0.18), transparent 34%),
+                radial-gradient(circle at 82% 22%, rgba(101, 241, 255, 0.18), transparent 34%),
+                linear-gradient(135deg, rgba(8, 9, 23, 0.92), rgba(7, 21, 30, 0.92));
+            backdrop-filter: blur(7px);
         }
         .archery-final-card {
-            width: 280px;
-            height: 178px;
+            width: 300px;
+            height: 188px;
             box-sizing: border-box;
             padding: 22px 24px;
-            border: 1px solid rgba(246, 212, 142, 0.66);
+            border: 1px solid rgba(101, 241, 255, 0.5);
             border-radius: 8px;
-            background: linear-gradient(160deg, rgba(255, 247, 230, 0.16), rgba(20, 31, 30, 0.94));
-            color: #fff7e6;
+            background:
+                linear-gradient(155deg, rgba(101, 241, 255, 0.14), rgba(255, 46, 154, 0.12)),
+                linear-gradient(180deg, rgba(11, 17, 38, 0.94), rgba(7, 17, 27, 0.94));
+            color: #f8fbff;
             text-align: center;
-            box-shadow: 0 22px 60px rgba(0, 0, 0, 0.45), 0 0 28px rgba(245, 196, 95, 0.22);
+            box-shadow: 0 22px 60px rgba(0, 0, 0, 0.45), 0 0 28px rgba(101, 241, 255, 0.24), inset 0 0 22px rgba(255, 46, 154, 0.08);
             opacity: 0;
             animation: finalPop 0.62s ease forwards var(--final-delay);
             display: flex;
@@ -3778,13 +4120,14 @@ function ensureArcheryLotteryStyles() {
             display: block;
             width: 100%;
             margin-bottom: 14px;
-            color: #f5c45f;
+            color: #65f1ff;
             font-size: 20px;
-            font-weight: 700;
+            font-weight: 900;
             line-height: 1.15;
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
+            text-shadow: 0 0 16px rgba(101, 241, 255, 0.56);
         }
         .archery-final-card strong {
             display: flex;
@@ -3797,6 +4140,8 @@ function ensureArcheryLotteryStyles() {
             word-break: break-word;
             overflow: hidden;
             white-space: normal;
+            color: #ffd55e;
+            text-shadow: 0 0 20px rgba(255, 213, 94, 0.58), 0 0 34px rgba(255, 46, 154, 0.22);
         }
         .archery-lottery-field.showing-final .archery-eggs-area,
         .archery-lottery-field.showing-final .archery-bow,
@@ -3804,6 +4149,26 @@ function ensureArcheryLotteryStyles() {
             opacity: 0.18;
         }
         @media (max-width: 760px) {
+            .lottery-cyber-stage {
+                padding: 16px;
+                align-items: center;
+            }
+            .lottery-cyber-panel {
+                padding: 26px 20px;
+            }
+            .lottery-cyber-prize {
+                grid-template-columns: 72px 1fr;
+                gap: 10px;
+                padding: 11px 12px;
+            }
+            .lottery-cyber-prize.is-result {
+                grid-template-columns: 1fr;
+                align-items: start;
+            }
+            .lottery-cyber-start-btn {
+                height: 54px;
+                font-size: 21px;
+            }
             .archery-lottery-stage {
                 padding: 12px 8px;
                 justify-content: center;
@@ -3902,12 +4267,80 @@ function ensureArcheryLotteryStyles() {
     document.head.appendChild(style);
 }
 
-// 显示抽奖动画 - 霓虹灯轮盘
-function showLotteryAnimation(allPlayers, winners, prizes, onComplete) {
+function getLotteryIssueDate(date = new Date()) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}${month}${day}`;
+}
+
+function renderLotteryReadyScreen(container, prizes, onStart, options = {}) {
+    ensureArcheryLotteryStyles();
+
+    const issue = options.issue || getLotteryIssueDate();
+    const stage = document.createElement('div');
+    stage.className = 'lottery-cyber-stage';
+    stage.innerHTML = `
+        <div class="lottery-cyber-grid" aria-hidden="true"></div>
+        <div class="lottery-cyber-panel">
+            <div class="lottery-cyber-kicker">NEON DRAW SYSTEM</div>
+            <h1 class="lottery-cyber-title">加州大乐透</h1>
+            <div class="lottery-cyber-subtitle">${issue}期</div>
+            <div class="lottery-cyber-divider"></div>
+            <div class="lottery-cyber-prize-heading">本期奖品</div>
+            <div class="lottery-cyber-prize-list"></div>
+            <button type="button" class="lottery-cyber-start-btn">抽奖</button>
+        </div>
+    `;
+
+    const list = stage.querySelector('.lottery-cyber-prize-list');
+    renderCyberPrizeItems(list, prizes);
+
+    const startButton = stage.querySelector('.lottery-cyber-start-btn');
+    startButton.addEventListener('click', () => {
+        startButton.disabled = true;
+        stage.classList.add('is-launching');
+        setTimeout(onStart, 520);
+    });
+
+    container.appendChild(stage);
+}
+
+function renderCyberPrizeItems(container, prizes, winners = []) {
+    container.innerHTML = '';
+
+    prizes.forEach((prize, index) => {
+        const item = document.createElement('div');
+        item.className = winners.length > 0 ? 'lottery-cyber-prize is-result' : 'lottery-cyber-prize';
+
+        const label = document.createElement('span');
+        label.textContent = `奖品 ${String(index + 1).padStart(2, '0')}`;
+        item.appendChild(label);
+
+        const name = document.createElement('strong');
+        name.textContent = prize || `奖品${index + 1}`;
+        item.appendChild(name);
+
+        if (winners.length > 0) {
+            const winner = document.createElement('b');
+            winner.textContent = winners[index] || '-';
+            item.appendChild(winner);
+        }
+
+        container.appendChild(item);
+    });
+}
+
+// 显示抽奖动画
+function showLotteryAnimation(allPlayers, winners, prizes, onComplete, options = {}) {
     const container = document.getElementById('lottery-animation-container');
+    const issue = options.issue || getLotteryIssueDate();
     container.style.display = 'flex';
     container.innerHTML = '';
-    renderArcheryEggLotteryAnimation(container, allPlayers, winners, prizes, onComplete);
+    renderLotteryReadyScreen(container, prizes, () => {
+        container.innerHTML = '';
+        renderArcheryEggLotteryAnimation(container, allPlayers, winners, prizes, onComplete, { issue });
+    }, { issue });
     return;
 
     const stagePalette = {
