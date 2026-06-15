@@ -2552,7 +2552,7 @@ function renderArcheryEggLotteryAnimation(container, allPlayers, winners, prizes
             const updatesPerTick = Math.max(1, Math.ceil(eggItems.length / 3));
             for (let i = 0; i < updatesPerTick; i++) {
                 const item = eggItems[(cycleEggIndex + i) % eggItems.length];
-                if (!item || item.isChanging) continue;
+                if (!item || item.isChanging || item.egg.classList.contains('is-winner')) continue;
 
                 const playerId = getNextDisplayPlayer(item.slotIndex);
                 updateEggName(item, playerId);
@@ -4240,15 +4240,10 @@ function ensureArcheryLotteryStyles() {
             word-break: break-word;
             overflow: hidden;
             white-space: normal;
-            color: transparent;
-            background:
-                linear-gradient(100deg, #8a4a08 0%, #fff7cf 16%, #ffd55e 30%, #c87a12 48%, #fff0a8 62%, #ffba2f 78%, #7a3c05 100%);
-            background-size: 260% 100%;
-            -webkit-background-clip: text;
-            background-clip: text;
-            -webkit-text-stroke: 1px rgba(92, 44, 5, 0.72);
-            text-shadow: 0 2px 0 rgba(112, 45, 0, 0.72), 0 6px 10px rgba(0, 0, 0, 0.48), 0 0 18px rgba(255, 213, 94, 0.72), 0 0 36px rgba(255, 46, 154, 0.28);
-            animation: casinoGoldSweep 2.2s linear infinite, jackpotWinnerPulse 1.2s ease-in-out infinite;
+            color: #fff;
+            -webkit-text-stroke: 1px rgba(255, 213, 94, 0.55);
+            text-shadow: 0 2px 0 rgba(8, 10, 24, 0.9), 0 7px 14px rgba(0, 0, 0, 0.58), 0 0 18px rgba(255, 255, 255, 0.92), 0 0 34px rgba(101, 241, 255, 0.68), 0 0 54px rgba(255, 46, 154, 0.34);
+            animation: jackpotWinnerPulse 1.2s ease-in-out infinite;
             position: relative;
             z-index: 1;
         }
