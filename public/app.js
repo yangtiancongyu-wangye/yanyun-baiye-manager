@@ -2405,6 +2405,11 @@ function renderArcheryEggLotteryAnimation(container, allPlayers, winners, prizes
         const finalList = document.createElement('div');
         finalList.className = 'archery-final-list';
 
+        const jackpotSign = document.createElement('div');
+        jackpotSign.className = 'lottery-final-jackpot-sign';
+        jackpotSign.innerHTML = '<span>JACKPOT</span><strong>中奖名单</strong>';
+        finalList.appendChild(jackpotSign);
+
         winners.forEach((winner, index) => {
             const card = document.createElement('div');
             card.className = 'archery-final-card lottery-cyber-result-card';
@@ -2431,7 +2436,7 @@ function renderArcheryEggLotteryAnimation(container, allPlayers, winners, prizes
             container.style.display = 'none';
             container.innerHTML = '';
             onComplete();
-        }, 4600);
+        }, 6600);
     }
 
     function createImpactBurst(targetEgg) {
@@ -3021,6 +3026,22 @@ function ensureArcheryLotteryStyles() {
             0%, 100% { filter: drop-shadow(0 0 16px rgba(101, 241, 255, 0.45)); }
             50% { filter: drop-shadow(0 0 28px rgba(255, 46, 154, 0.62)); }
         }
+        @keyframes casinoBulbChase {
+            0%, 100% { filter: drop-shadow(0 0 8px rgba(255, 213, 94, 0.55)); opacity: 0.74; }
+            50% { filter: drop-shadow(0 0 18px rgba(255, 46, 154, 0.78)); opacity: 1; }
+        }
+        @keyframes casinoGoldSweep {
+            0% { background-position: -180% 0; }
+            100% { background-position: 220% 0; }
+        }
+        @keyframes jackpotWinnerPulse {
+            0%, 100% { transform: translateY(0) scale(1); filter: saturate(1.08) brightness(1); }
+            50% { transform: translateY(-2px) scale(1.035); filter: saturate(1.35) brightness(1.14); }
+        }
+        @keyframes jackpotSignFlash {
+            0%, 100% { opacity: 1; text-shadow: 0 0 16px rgba(255, 213, 94, 0.72), 0 0 32px rgba(255, 46, 154, 0.34); }
+            50% { opacity: 0.82; text-shadow: 0 0 22px rgba(101, 241, 255, 0.78), 0 0 46px rgba(255, 213, 94, 0.5); }
+        }
         .lottery-cyber-stage {
             width: 100%;
             height: 100vh;
@@ -3032,9 +3053,10 @@ function ensureArcheryLotteryStyles() {
             box-sizing: border-box;
             padding: clamp(18px, 4vw, 46px);
             background:
-                radial-gradient(circle at 18% 18%, rgba(255, 46, 154, 0.24), transparent 28%),
-                radial-gradient(circle at 82% 20%, rgba(101, 241, 255, 0.22), transparent 30%),
-                radial-gradient(circle at 52% 88%, rgba(255, 213, 94, 0.14), transparent 30%),
+                repeating-radial-gradient(circle at 50% 120%, rgba(255, 213, 94, 0.08) 0 4px, transparent 5px 20px),
+                radial-gradient(circle at 18% 18%, rgba(255, 46, 154, 0.3), transparent 28%),
+                radial-gradient(circle at 82% 20%, rgba(101, 241, 255, 0.25), transparent 30%),
+                radial-gradient(circle at 52% 88%, rgba(255, 213, 94, 0.2), transparent 30%),
                 linear-gradient(135deg, #080917 0%, #101024 46%, #07151e 100%);
             color: #f8fbff;
             font-family: 'Microsoft YaHei', 'Segoe UI', sans-serif;
@@ -3049,7 +3071,8 @@ function ensureArcheryLotteryStyles() {
         .lottery-cyber-stage::before {
             background:
                 linear-gradient(90deg, transparent 0 48%, rgba(101, 241, 255, 0.26) 49% 50%, transparent 51% 100%),
-                repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.04) 0 1px, transparent 1px 28px);
+                repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.04) 0 1px, transparent 1px 28px),
+                repeating-linear-gradient(90deg, rgba(255, 213, 94, 0.08) 0 2px, transparent 2px 64px);
             mask-image: linear-gradient(180deg, transparent, #000 16%, #000 84%, transparent);
         }
         .lottery-cyber-stage::after {
@@ -3072,19 +3095,31 @@ function ensureArcheryLotteryStyles() {
             opacity: 0.5;
         }
         .lottery-cyber-panel {
-            width: min(760px, 92vw);
+            width: min(820px, 92vw);
             position: relative;
             z-index: 2;
             box-sizing: border-box;
             padding: clamp(28px, 5vw, 56px);
-            border: 1px solid rgba(101, 241, 255, 0.48);
+            border: 1px solid rgba(255, 213, 94, 0.58);
             border-radius: 8px;
             background:
-                linear-gradient(135deg, rgba(10, 14, 34, 0.9), rgba(8, 23, 34, 0.78)),
-                radial-gradient(circle at 20% 0%, rgba(255, 46, 154, 0.18), transparent 38%),
+                linear-gradient(135deg, rgba(13, 10, 34, 0.92), rgba(9, 25, 34, 0.82)),
+                radial-gradient(circle at 20% 0%, rgba(255, 46, 154, 0.28), transparent 38%),
                 radial-gradient(circle at 84% 14%, rgba(101, 241, 255, 0.18), transparent 36%);
             backdrop-filter: blur(10px);
             animation: cyberPanelPulse 2.8s ease-in-out infinite;
+        }
+        .lottery-casino-bulbs {
+            position: absolute;
+            left: 16px;
+            right: 16px;
+            top: 14px;
+            height: 10px;
+            border-radius: 999px;
+            background:
+                radial-gradient(circle, #ffd55e 0 3px, transparent 4px) 0 0 / 28px 10px repeat-x;
+            animation: casinoBulbChase 0.85s steps(2, end) infinite;
+            opacity: 0.86;
         }
         .lottery-cyber-panel::before {
             content: '';
@@ -3106,8 +3141,9 @@ function ensureArcheryLotteryStyles() {
             font-size: clamp(42px, 8vw, 82px);
             line-height: 1;
             letter-spacing: 0;
-            color: #fff;
-            text-shadow: 0 0 20px rgba(101, 241, 255, 0.72), 0 0 42px rgba(255, 46, 154, 0.42);
+            color: #fff7cf;
+            -webkit-text-stroke: 1px rgba(255, 213, 94, 0.5);
+            text-shadow: 0 0 16px rgba(255, 213, 94, 0.74), 0 0 34px rgba(255, 46, 154, 0.5), 0 5px 0 rgba(80, 22, 54, 0.85);
         }
         .lottery-cyber-subtitle {
             margin-top: 12px;
@@ -3115,6 +3151,27 @@ function ensureArcheryLotteryStyles() {
             font-size: clamp(20px, 3vw, 32px);
             font-weight: 900;
             text-shadow: 0 0 18px rgba(255, 213, 94, 0.52);
+        }
+        .lottery-casino-chip-row {
+            display: flex;
+            gap: 10px;
+            margin-top: 18px;
+            align-items: center;
+        }
+        .lottery-casino-chip-row i {
+            width: 34px;
+            height: 34px;
+            border-radius: 50%;
+            background:
+                radial-gradient(circle at 50% 50%, #111827 0 8px, transparent 9px),
+                conic-gradient(#ff2e9a 0 12%, #fff7cf 12% 24%, #65f1ff 24% 36%, #fff7cf 36% 48%, #ff2e9a 48% 60%, #fff7cf 60% 72%, #65f1ff 72% 84%, #fff7cf 84% 100%);
+            box-shadow: 0 0 14px rgba(255, 46, 154, 0.35), inset 0 0 0 2px rgba(255, 255, 255, 0.42);
+        }
+        .lottery-casino-chip-row i:nth-child(2),
+        .lottery-casino-chip-row i:nth-child(4) {
+            background:
+                radial-gradient(circle at 50% 50%, #111827 0 8px, transparent 9px),
+                conic-gradient(#ffd55e 0 12%, #fff7cf 12% 24%, #ff2e9a 24% 36%, #fff7cf 36% 48%, #ffd55e 48% 60%, #fff7cf 60% 72%, #ff2e9a 72% 84%, #fff7cf 84% 100%);
         }
         .lottery-cyber-divider {
             height: 1px;
@@ -3140,10 +3197,12 @@ function ensureArcheryLotteryStyles() {
             align-items: center;
             gap: 14px;
             padding: 12px 16px;
-            border: 1px solid rgba(101, 241, 255, 0.26);
+            border: 1px solid rgba(255, 213, 94, 0.3);
             border-radius: 8px;
-            background: linear-gradient(90deg, rgba(101, 241, 255, 0.1), rgba(255, 46, 154, 0.08));
-            box-shadow: inset 0 0 18px rgba(101, 241, 255, 0.07);
+            background:
+                linear-gradient(90deg, rgba(101, 241, 255, 0.12), rgba(255, 46, 154, 0.1)),
+                repeating-linear-gradient(135deg, rgba(255, 213, 94, 0.04) 0 7px, transparent 7px 14px);
+            box-shadow: inset 0 0 18px rgba(101, 241, 255, 0.08), 0 0 18px rgba(255, 213, 94, 0.08);
         }
         .lottery-cyber-prize span {
             color: #65f1ff;
@@ -3178,8 +3237,10 @@ function ensureArcheryLotteryStyles() {
             color: #061018;
             font-size: 23px;
             font-weight: 1000;
-            background: linear-gradient(90deg, #65f1ff, #ffd55e 48%, #ff2e9a);
-            box-shadow: 0 0 28px rgba(101, 241, 255, 0.4), 0 0 48px rgba(255, 46, 154, 0.22);
+            background:
+                linear-gradient(90deg, rgba(255,255,255,0.72), transparent 18%, transparent 82%, rgba(255,255,255,0.5)),
+                linear-gradient(90deg, #65f1ff, #ffd55e 48%, #ff2e9a);
+            box-shadow: 0 0 28px rgba(101, 241, 255, 0.42), 0 0 48px rgba(255, 46, 154, 0.28), inset 0 -5px 0 rgba(96, 18, 57, 0.36);
             animation: cyberButtonGlow 1.5s ease-in-out infinite;
         }
         .lottery-cyber-start-btn:disabled {
@@ -4091,30 +4152,69 @@ function ensureArcheryLotteryStyles() {
             gap: 16px;
             padding: 44px;
             background:
-                radial-gradient(circle at 18% 18%, rgba(255, 46, 154, 0.18), transparent 34%),
-                radial-gradient(circle at 82% 22%, rgba(101, 241, 255, 0.18), transparent 34%),
-                linear-gradient(135deg, rgba(8, 9, 23, 0.92), rgba(7, 21, 30, 0.92));
+                repeating-radial-gradient(circle at 50% 118%, rgba(255, 213, 94, 0.12) 0 5px, transparent 6px 24px),
+                radial-gradient(circle at 18% 18%, rgba(255, 46, 154, 0.24), transparent 34%),
+                radial-gradient(circle at 82% 22%, rgba(101, 241, 255, 0.2), transparent 34%),
+                linear-gradient(135deg, rgba(8, 9, 23, 0.95), rgba(7, 21, 30, 0.93));
             backdrop-filter: blur(7px);
         }
+        .lottery-final-jackpot-sign {
+            width: min(920px, 100%);
+            flex: 0 0 100%;
+            display: flex;
+            align-items: baseline;
+            justify-content: center;
+            gap: 16px;
+            margin-bottom: 4px;
+            color: #fff7cf;
+            text-align: center;
+            animation: jackpotSignFlash 1.08s ease-in-out infinite;
+        }
+        .lottery-final-jackpot-sign span {
+            color: #ff2e9a;
+            font-size: clamp(24px, 4vw, 46px);
+            font-weight: 1000;
+            line-height: 1;
+            -webkit-text-stroke: 1px rgba(255, 255, 255, 0.5);
+        }
+        .lottery-final-jackpot-sign strong {
+            color: #ffd55e;
+            font-size: clamp(28px, 4.8vw, 58px);
+            line-height: 1;
+            -webkit-text-stroke: 1px rgba(93, 46, 8, 0.62);
+        }
         .archery-final-card {
-            width: 300px;
-            height: 188px;
+            width: 318px;
+            height: 200px;
             box-sizing: border-box;
-            padding: 22px 24px;
-            border: 1px solid rgba(101, 241, 255, 0.5);
+            padding: 22px 24px 24px;
+            border: 1px solid rgba(255, 213, 94, 0.64);
             border-radius: 8px;
             background:
-                linear-gradient(155deg, rgba(101, 241, 255, 0.14), rgba(255, 46, 154, 0.12)),
-                linear-gradient(180deg, rgba(11, 17, 38, 0.94), rgba(7, 17, 27, 0.94));
+                linear-gradient(135deg, rgba(255, 247, 207, 0.12), transparent 34%),
+                radial-gradient(circle at 78% 18%, rgba(255, 46, 154, 0.2), transparent 36%),
+                linear-gradient(155deg, rgba(101, 241, 255, 0.16), rgba(255, 46, 154, 0.14)),
+                linear-gradient(180deg, rgba(14, 10, 34, 0.96), rgba(9, 18, 28, 0.95));
             color: #f8fbff;
             text-align: center;
-            box-shadow: 0 22px 60px rgba(0, 0, 0, 0.45), 0 0 28px rgba(101, 241, 255, 0.24), inset 0 0 22px rgba(255, 46, 154, 0.08);
+            box-shadow: 0 22px 60px rgba(0, 0, 0, 0.48), 0 0 28px rgba(255, 213, 94, 0.22), 0 0 46px rgba(255, 46, 154, 0.18), inset 0 0 22px rgba(255, 213, 94, 0.1);
             opacity: 0;
             animation: finalPop 0.62s ease forwards var(--final-delay);
             display: flex;
             flex-direction: column;
             justify-content: center;
             align-items: center;
+            position: relative;
+            overflow: hidden;
+        }
+        .archery-final-card::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(110deg, transparent 0 34%, rgba(255, 255, 255, 0.26) 42%, transparent 52% 100%);
+            background-size: 220% 100%;
+            animation: casinoGoldSweep 2.4s ease-in-out infinite;
+            pointer-events: none;
         }
         .archery-final-card span {
             display: block;
@@ -4134,14 +4234,23 @@ function ensureArcheryLotteryStyles() {
             align-items: center;
             justify-content: center;
             width: 100%;
-            height: 82px;
+            height: 92px;
             line-height: 1.05;
             overflow-wrap: anywhere;
             word-break: break-word;
             overflow: hidden;
             white-space: normal;
-            color: #ffd55e;
-            text-shadow: 0 0 20px rgba(255, 213, 94, 0.58), 0 0 34px rgba(255, 46, 154, 0.22);
+            color: transparent;
+            background:
+                linear-gradient(100deg, #8a4a08 0%, #fff7cf 16%, #ffd55e 30%, #c87a12 48%, #fff0a8 62%, #ffba2f 78%, #7a3c05 100%);
+            background-size: 260% 100%;
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-stroke: 1px rgba(92, 44, 5, 0.72);
+            text-shadow: 0 2px 0 rgba(112, 45, 0, 0.72), 0 6px 10px rgba(0, 0, 0, 0.48), 0 0 18px rgba(255, 213, 94, 0.72), 0 0 36px rgba(255, 46, 154, 0.28);
+            animation: casinoGoldSweep 2.2s linear infinite, jackpotWinnerPulse 1.2s ease-in-out infinite;
+            position: relative;
+            z-index: 1;
         }
         .archery-lottery-field.showing-final .archery-eggs-area,
         .archery-lottery-field.showing-final .archery-bow,
@@ -4155,6 +4264,14 @@ function ensureArcheryLotteryStyles() {
             }
             .lottery-cyber-panel {
                 padding: 26px 20px;
+            }
+            .lottery-casino-bulbs {
+                left: 12px;
+                right: 12px;
+            }
+            .lottery-casino-chip-row i {
+                width: 28px;
+                height: 28px;
             }
             .lottery-cyber-prize {
                 grid-template-columns: 72px 1fr;
@@ -4251,16 +4368,21 @@ function ensureArcheryLotteryStyles() {
                 padding: 22px;
                 align-content: center;
             }
+            .lottery-final-jackpot-sign {
+                flex-direction: column;
+                gap: 4px;
+                margin-bottom: 0;
+            }
             .archery-final-card {
-                width: min(250px, 84vw);
-                height: 150px;
+                width: min(270px, 84vw);
+                height: 160px;
                 padding: 18px 20px;
             }
             .archery-final-card span {
                 font-size: 17px;
             }
             .archery-final-card strong {
-                height: 70px;
+                height: 76px;
             }
         }
     `;
@@ -4280,12 +4402,16 @@ function renderLotteryReadyScreen(container, prizes, onStart, options = {}) {
     const issue = options.issue || getLotteryIssueDate();
     const stage = document.createElement('div');
     stage.className = 'lottery-cyber-stage';
-    stage.innerHTML = `
+        stage.innerHTML = `
         <div class="lottery-cyber-grid" aria-hidden="true"></div>
         <div class="lottery-cyber-panel">
-            <div class="lottery-cyber-kicker">NEON DRAW SYSTEM</div>
+            <div class="lottery-casino-bulbs" aria-hidden="true"></div>
+            <div class="lottery-cyber-kicker">CYBER CASINO JACKPOT</div>
             <h1 class="lottery-cyber-title">加州大乐透</h1>
             <div class="lottery-cyber-subtitle">${issue}期</div>
+            <div class="lottery-casino-chip-row" aria-hidden="true">
+                <i></i><i></i><i></i><i></i><i></i>
+            </div>
             <div class="lottery-cyber-divider"></div>
             <div class="lottery-cyber-prize-heading">本期奖品</div>
             <div class="lottery-cyber-prize-list"></div>
