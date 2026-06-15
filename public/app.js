@@ -2438,7 +2438,7 @@ function renderArcheryEggLotteryAnimation(container, allPlayers, winners, prizes
             onComplete();
         };
         const minimumFinalHold = new Promise(resolve => setTimeout(resolve, 6600));
-        const announcement = announceJackpotWinners(winners);
+        const announcement = announceJackpotWinners(winners, sfx);
 
         Promise.all([minimumFinalHold, announcement])
             .then(() => sfx.applause())
@@ -2803,7 +2803,38 @@ function renderArcheryEggLotteryAnimation(container, allPlayers, winners, prizes
         element.style.overflow = 'hidden';
     }
 
-    function announceJackpotWinners(winnerNames) {
+    const ANNOUNCER_PINYIN_MAP = Object.freeze({
+        '一': 'yi', '三': 'san', '上': 'shang', '下': 'xia', '不': 'bu', '丝': 'si', '中': 'zhong', '义': 'yi',
+        '之': 'zhi', '乐': 'le', '九': 'jiu', '了': 'le', '五': 'wu', '仔': 'zai', '代': 'dai', '令': 'ling',
+        '以': 'yi', '伞': 'san', '伴': 'ban', '佟': 'tong', '光': 'guang', '兔': 'tu', '八': 'ba', '公': 'gong',
+        '典': 'dian', '冷': 'leng', '出': 'chu', '刀': 'dao', '分': 'fen', '剑': 'jian', '加': 'jia', '北': 'bei',
+        '十': 'shi', '千': 'qian', '半': 'ban', '南': 'nan', '卡': 'ka', '又': 'you', '双': 'shuang', '叶': 'ye',
+        '名': 'ming', '周': 'zhou', '唐': 'tang', '喵': 'miao', '嗟': 'jie', '嚯': 'huo', '土': 'tu', '均': 'jun',
+        '城': 'cheng', '境': 'jing', '墨': 'mo', '壹': 'yi', '夏': 'xia', '夜': 'ye', '大': 'da', '天': 'tian',
+        '夫': 'fu', '头': 'tou', '奖': 'jiang', '奶': 'nai', '如': 'ru', '威': 'wei', '季': 'ji', '孤': 'gu',
+        '安': 'an', '宛': 'wan', '宫': 'gong', '宵': 'xiao', '寂': 'ji', '寒': 'han', '寺': 'si', '寻': 'xun',
+        '小': 'xiao', '少': 'shao', '尘': 'chen', '山': 'shan', '川': 'chuan', '州': 'zhou', '常': 'chang', '平': 'ping',
+        '年': 'nian', '引': 'yin', '慕': 'mu', '战': 'zhan', '扇': 'shan', '打': 'da', '抽': 'chou', '拳': 'quan',
+        '撼': 'han', '擎': 'qing', '攸': 'you', '斩': 'zhan', '新': 'xin', '方': 'fang', '无': 'wu', '明': 'ming',
+        '星': 'xing', '昭': 'zhao', '晏': 'yan', '晴': 'qing', '曌': 'zhao', '曦': 'xi', '更': 'geng', '曼': 'man',
+        '月': 'yue', '有': 'you', '未': 'wei', '杉': 'shan', '条': 'tiao', '杨': 'yang', '杯': 'bei', '极': 'ji',
+        '林': 'lin', '枪': 'qiang', '柒': 'qi', '柳': 'liu', '柴': 'chai', '柿': 'shi', '校': 'xiao', '梵': 'fan',
+        '次': 'ci', '歆': 'xin', '歌': 'ge', '水': 'shui', '江': 'jiang', '沄': 'yun', '沉': 'chen', '法': 'fa',
+        '活': 'huo', '流': 'liu', '测': 'ce', '涂': 'tu', '涧': 'jian', '淮': 'huai', '清': 'qing', '渊': 'yuan',
+        '渴': 'ke', '潋': 'lian', '澄': 'cheng', '澜': 'lan', '灌': 'guan', '灭': 'mie', '灵': 'ling', '炎': 'yan',
+        '烟': 'yan', '燕': 'yan', '牵': 'qian', '独': 'du', '王': 'wang', '生': 'sheng', '百': 'bai', '石': 'shi',
+        '禄': 'lu', '穗': 'sui', '精': 'jing', '红': 'hong', '纯': 'chun', '绮': 'qi', '羊': 'yang', '羽': 'yu',
+        '翎': 'ling', '翼': 'yi', '肉': 'rou', '苏': 'su', '荒': 'huang', '药': 'yao', '莫': 'mo', '蒙': 'meng',
+        '薛': 'xue', '薯': 'shu', '虹': 'hong', '蛊': 'gu', '螂': 'lang', '蟑': 'zhang', '裂': 'lie', '西': 'xi',
+        '觉': 'jue', '试': 'shi', '谷': 'gu', '豆': 'dou', '费': 'fei', '赵': 'zhao', '起': 'qi', '跃': 'yue',
+        '轻': 'qing', '输': 'shu', '辞': 'ci', '辰': 'chen', '迷': 'mi', '透': 'tou', '逢': 'feng', '郎': 'lang',
+        '重': 'chong', '野': 'ye', '金': 'jin', '钩': 'gou', '镜': 'jing', '长': 'zhang', '陌': 'mo', '零': 'ling',
+        '雷': 'lei', '雾': 'wu', '震': 'zhen', '霖': 'lin', '霸': 'ba', '青': 'qing', '音': 'yin', '顾': 'gu',
+        '风': 'feng', '飞': 'fei', '香': 'xiang', '鬼': 'gui', '魂': 'hun', '鸣': 'ming', '麟': 'lin',
+        '今': 'jin', '早': 'zao', '想': 'xiang', '阿': 'a', '洛': 'luo', '城': 'cheng', '泽': 'ze'
+    });
+
+    function announceJackpotWinners(winnerNames, sfxController = null) {
         if (!('speechSynthesis' in window) || !window.SpeechSynthesisUtterance) {
             return Promise.resolve();
         }
@@ -2812,34 +2843,119 @@ function renderArcheryEggLotteryAnimation(container, allPlayers, winners, prizes
         if (names.length === 0) return Promise.resolve();
 
         window.speechSynthesis.cancel();
+        sfxController?.hypeIntro?.();
 
-        return new Promise(resolve => {
-            const voices = window.speechSynthesis.getVoices();
+        return resolveSpeechVoices().then(voices => new Promise(resolve => {
             const preferredVoice = voices.find(voice => /^en[-_]/i.test(voice.lang) && /fred|daniel|alex|google|microsoft|premium/i.test(voice.name)) ||
                 voices.find(voice => /^en[-_]/i.test(voice.lang)) ||
                 null;
             const championLabel = names.length > 1 ? 'jackpot champions' : 'jackpot champion';
-            const spokenNames = names.join('! ');
-            const script = `Ladies and gentlemen, all eyes to the stage! Tonight, destiny has dealt its finest hand! A legendary jackpot has been won, and a new name enters the hall of fortune! Please give a grand round of applause to our ${championLabel} — ${spokenNames}!`;
+            const introScript = `LADIES AND GENTLEMEN! All eyes to the stage! Tonight, destiny has dealt its finest hand! A legendary jackpot has been won! And a new name enters the hall of fortune! Please give a GRAND round of applause to our ${championLabel}!`;
             let resolved = false;
-            const fallbackTimer = setTimeout(finish, Math.max(18000, names.length * 5500 + 14000));
+            let namesStarted = false;
+            let keepAliveTimer = null;
+            let introGuardTimer = null;
+            const fallbackTimer = setTimeout(finish, Math.max(24000, names.length * 7000 + 14000));
 
             function finish() {
                 if (resolved) return;
                 resolved = true;
                 clearTimeout(fallbackTimer);
+                clearTimeout(introGuardTimer);
+                clearInterval(keepAliveTimer);
                 resolve();
             }
 
-            const utterance = new SpeechSynthesisUtterance(script);
-            utterance.lang = 'en-US';
-            utterance.volume = 1;
-            utterance.rate = 1.04;
-            utterance.pitch = 1.18;
-            if (preferredVoice) utterance.voice = preferredVoice;
-            utterance.onend = () => setTimeout(finish, 700);
-            utterance.onerror = () => setTimeout(finish, 300);
-            window.speechSynthesis.speak(utterance);
+            function keepSpeechAwake() {
+                if (keepAliveTimer) return;
+                keepAliveTimer = setInterval(() => {
+                    if (!resolved && window.speechSynthesis.speaking) {
+                        window.speechSynthesis.resume();
+                    }
+                }, 950);
+            }
+
+            function startNames() {
+                if (namesStarted || resolved) return;
+                namesStarted = true;
+                clearTimeout(introGuardTimer);
+                speakName(0);
+            }
+
+            function speakName(index) {
+                if (index >= names.length) {
+                    sfxController?.crowdSwell?.();
+                    setTimeout(finish, 900);
+                    return;
+                }
+
+                sfxController?.namePunch?.(index);
+                const name = names[index];
+                const announcerName = buildEnglishAnnouncerName(name);
+                const utterance = new SpeechSynthesisUtterance(`${announcerName}!`);
+                utterance.lang = 'en-US';
+                utterance.volume = 1;
+                utterance.rate = 1.08;
+                utterance.pitch = 1.36;
+                if (preferredVoice) utterance.voice = preferredVoice;
+                const nextName = () => setTimeout(() => speakName(index + 1), 260);
+                utterance.onend = nextName;
+                utterance.onerror = nextName;
+                window.speechSynthesis.speak(utterance);
+            }
+
+            const intro = new SpeechSynthesisUtterance(introScript);
+            intro.lang = 'en-US';
+            intro.volume = 1;
+            intro.rate = 1.18;
+            intro.pitch = 1.34;
+            if (preferredVoice) intro.voice = preferredVoice;
+            intro.onstart = keepSpeechAwake;
+            intro.onend = () => setTimeout(startNames, 220);
+            intro.onerror = () => setTimeout(startNames, 160);
+            introGuardTimer = setTimeout(startNames, 12500);
+            keepSpeechAwake();
+            window.speechSynthesis.speak(intro);
+            window.speechSynthesis.resume();
+        }));
+    }
+
+    function buildEnglishAnnouncerName(name) {
+        const tokens = [];
+        let latinBuffer = '';
+
+        function flushLatinBuffer() {
+            if (!latinBuffer) return;
+            tokens.push(latinBuffer);
+            latinBuffer = '';
+        }
+
+        Array.from(String(name)).forEach(char => {
+            if (/[\u3400-\u9fff]/.test(char)) {
+                flushLatinBuffer();
+                tokens.push(ANNOUNCER_PINYIN_MAP[char] || 'han');
+            } else if (/[a-z0-9]/i.test(char)) {
+                latinBuffer += char;
+            } else {
+                flushLatinBuffer();
+            }
+        });
+        flushLatinBuffer();
+
+        const spoken = tokens.join(' ').replace(/\s+/g, ' ').trim();
+        return spoken || String(name).replace(/[^\w]+/g, ' ').trim() || 'champion';
+    }
+
+    function resolveSpeechVoices() {
+        const voices = window.speechSynthesis.getVoices();
+        if (voices.length > 0) return Promise.resolve(voices);
+
+        return new Promise(resolve => {
+            const timer = setTimeout(() => resolve(window.speechSynthesis.getVoices()), 320);
+            window.speechSynthesis.onvoiceschanged = () => {
+                clearTimeout(timer);
+                resolve(window.speechSynthesis.getVoices());
+            };
         });
     }
 
@@ -2935,6 +3051,36 @@ function renderArcheryEggLotteryAnimation(container, allPlayers, winners, prizes
             source.stop(start + duration);
         }
 
+        function crowdBed({ duration = 3, gain = 0.06, delay = 0 }) {
+            if (!window.AudioContext && !window.webkitAudioContext) return;
+            const ctx = getContext();
+            const start = ctx.currentTime + delay;
+            const buffer = ctx.createBuffer(1, Math.max(1, Math.floor(ctx.sampleRate * duration)), ctx.sampleRate);
+            const data = buffer.getChannelData(0);
+            for (let i = 0; i < data.length; i++) {
+                data[i] = (Math.random() * 2 - 1) * (0.55 + Math.random() * 0.45);
+            }
+            const source = ctx.createBufferSource();
+            const low = ctx.createBiquadFilter();
+            const high = ctx.createBiquadFilter();
+            const volume = ctx.createGain();
+            source.buffer = buffer;
+            low.type = 'lowpass';
+            low.frequency.setValueAtTime(3200, start);
+            high.type = 'highpass';
+            high.frequency.setValueAtTime(260, start);
+            volume.gain.setValueAtTime(0.0001, start);
+            volume.gain.exponentialRampToValueAtTime(gain, start + 0.08);
+            volume.gain.setValueAtTime(gain * 0.72, start + duration * 0.45);
+            volume.gain.exponentialRampToValueAtTime(0.0001, start + duration);
+            source.connect(high);
+            high.connect(low);
+            low.connect(volume);
+            volume.connect(ctx.destination);
+            source.start(start);
+            source.stop(start + duration);
+        }
+
         return {
             draw() {
                 tone({ frequency: 132, endFrequency: 72, duration: 0.62, type: 'triangle', gain: 0.07 });
@@ -2964,31 +3110,55 @@ function renderArcheryEggLotteryAnimation(container, allPlayers, winners, prizes
                 noise({ duration: 0.2, gain: 0.05, filter: 2600, delay: 0.24 });
                 tone({ frequency: 196, endFrequency: 110, duration: 0.34, type: 'triangle', gain: 0.045, delay: 0.56 });
             },
+            hypeIntro() {
+                noise({ duration: 0.38, gain: 0.08, filter: 820, delay: 0 });
+                noise({ duration: 0.42, gain: 0.05, filter: 2400, delay: 0.05 });
+                tone({ frequency: 98, endFrequency: 58, duration: 0.5, type: 'sawtooth', gain: 0.055, delay: 0 });
+                tone({ frequency: 392, endFrequency: 784, duration: 0.26, type: 'triangle', gain: 0.026, delay: 0.18 });
+                tone({ frequency: 523, endFrequency: 1046, duration: 0.3, type: 'triangle', gain: 0.024, delay: 0.34 });
+            },
+            namePunch(index = 0) {
+                const delay = 0;
+                tone({ frequency: 72, endFrequency: 42, duration: 0.3, type: 'sawtooth', gain: 0.068, delay });
+                tone({ frequency: 520 + (index % 3) * 70, endFrequency: 980 + (index % 3) * 110, duration: 0.2, type: 'triangle', gain: 0.036, delay: delay + 0.03 });
+                tone({ frequency: 1280 + (index % 2) * 180, endFrequency: 1760, duration: 0.16, type: 'square', gain: 0.016, delay: delay + 0.08 });
+                noise({ duration: 0.22, gain: 0.058, filter: 1900, delay: delay + 0.02 });
+            },
+            crowdSwell() {
+                crowdBed({ duration: 1.15, gain: 0.09 });
+                for (let i = 0; i < 8; i++) {
+                    const delay = i * 0.1;
+                    tone({ frequency: 700 + Math.random() * 520, endFrequency: 1240 + Math.random() * 760, duration: 0.18, type: 'triangle', gain: 0.022, delay });
+                    noise({ duration: 0.18, gain: 0.032, filter: 2500 + Math.random() * 1200, delay: delay + 0.03 });
+                }
+            },
             applause() {
                 if (!window.AudioContext && !window.webkitAudioContext) {
-                    return new Promise(resolve => setTimeout(resolve, 3000));
+                    return new Promise(resolve => setTimeout(resolve, 3600));
                 }
 
-                for (let i = 0; i < 30; i++) {
-                    const delay = i * 0.095 + Math.random() * 0.06;
-                    const fade = Math.max(0.18, 1 - delay / 3);
+                crowdBed({ duration: 3.15, gain: 0.11 });
+
+                for (let i = 0; i < 68; i++) {
+                    const delay = i * 0.043 + Math.random() * 0.04;
+                    const fade = Math.max(0.08, 1 - delay / 3.05);
                     applauseNoise({
-                        duration: 0.08 + Math.random() * 0.07,
-                        gain: 0.04 * fade,
+                        duration: 0.07 + Math.random() * 0.085,
+                        gain: 0.088 * fade,
                         delay,
                         filter: 1200 + Math.random() * 1800,
-                        pan: Math.random() * 1.4 - 0.7
+                        pan: Math.random() * 1.6 - 0.8
                     });
                 }
 
-                for (let i = 0; i < 9; i++) {
-                    const delay = 0.16 + i * 0.28;
-                    const fade = Math.max(0.16, 1 - delay / 3.1);
-                    tone({ frequency: 720 + Math.random() * 420, endFrequency: 980 + Math.random() * 520, duration: 0.18, type: 'triangle', gain: 0.012 * fade, delay });
-                    noise({ duration: 0.18, gain: 0.018 * fade, filter: 2600 + Math.random() * 1200, delay: delay + 0.04 });
+                for (let i = 0; i < 20; i++) {
+                    const delay = 0.04 + i * 0.145;
+                    const fade = Math.max(0.1, 1 - delay / 3.05);
+                    tone({ frequency: 720 + Math.random() * 620, endFrequency: 1260 + Math.random() * 720, duration: 0.22, type: 'triangle', gain: 0.028 * fade, delay });
+                    noise({ duration: 0.23, gain: 0.036 * fade, filter: 2600 + Math.random() * 1600, delay: delay + 0.035 });
                 }
 
-                return new Promise(resolve => setTimeout(resolve, 3250));
+                return new Promise(resolve => setTimeout(resolve, 3650));
             }
         };
     }
