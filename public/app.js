@@ -2457,26 +2457,6 @@ function renderArcheryEggLotteryAnimation(container, allPlayers, winners, prizes
         targetEgg.classList.add('is-cracked');
         sfx.hit();
 
-        const orb = document.createElement('div');
-        orb.className = 'archery-prize-orb';
-        [
-            ['18%', '24%', '24px', '-24deg', '#7fd6c2', '#7389d8'],
-            ['54%', '21%', '19px', '18deg', '#8cd8f0', '#756ed0'],
-            ['69%', '56%', '27px', '34deg', '#67c7e8', '#4d76c9'],
-            ['27%', '68%', '21px', '-14deg', '#f2a7d2', '#7ed2e9'],
-            ['48%', '77%', '14px', '24deg', '#9be2f0', '#e89acb']
-        ].forEach(([left, top, size, rotation, colorA, colorB]) => {
-            const patch = document.createElement('i');
-            patch.style.setProperty('--patch-left', left);
-            patch.style.setProperty('--patch-top', top);
-            patch.style.setProperty('--patch-size', size);
-            patch.style.setProperty('--patch-rotate', rotation);
-            patch.style.setProperty('--patch-color-a', colorA);
-            patch.style.setProperty('--patch-color-b', colorB);
-            orb.appendChild(patch);
-        });
-        burst.appendChild(orb);
-
         for (let i = 0; i < 10; i++) {
             const shard = document.createElement('b');
             const angle = -Math.PI * 0.88 + (Math.PI * 1.76 * i) / 9;
@@ -2835,12 +2815,14 @@ function renderArcheryEggLotteryAnimation(container, allPlayers, winners, prizes
 
         return new Promise(resolve => {
             const voices = window.speechSynthesis.getVoices();
-            const preferredVoice = voices.find(voice => /^en[-_]/i.test(voice.lang) && /grand|premium|samantha|daniel|alex|google/i.test(voice.name)) ||
+            const preferredVoice = voices.find(voice => /^en[-_]/i.test(voice.lang) && /fred|daniel|alex|google|microsoft|premium/i.test(voice.name)) ||
                 voices.find(voice => /^en[-_]/i.test(voice.lang)) ||
                 null;
-            let index = 0;
+            const championLabel = names.length > 1 ? 'jackpot champions' : 'jackpot champion';
+            const spokenNames = names.join('! ');
+            const script = `Ladies and gentlemen, all eyes to the stage! Tonight, destiny has dealt its finest hand! A legendary jackpot has been won, and a new name enters the hall of fortune! Please give a grand round of applause to our ${championLabel} — ${spokenNames}!`;
             let resolved = false;
-            const fallbackTimer = setTimeout(finish, Math.max(22000, names.length * 24000));
+            const fallbackTimer = setTimeout(finish, Math.max(18000, names.length * 5500 + 14000));
 
             function finish() {
                 if (resolved) return;
@@ -2849,31 +2831,15 @@ function renderArcheryEggLotteryAnimation(container, allPlayers, winners, prizes
                 resolve();
             }
 
-            function speakNext() {
-                if (index >= names.length) {
-                    setTimeout(finish, 900);
-                    return;
-                }
-
-                const name = names[index];
-                const utterance = new SpeechSynthesisUtterance(`Ladies and gentlemen, all eyes to the stage. Tonight, destiny has dealt its finest hand. A legendary jackpot has been won, and a new name enters the hall of fortune. Please give a grand round of applause to our jackpot champion — ${name}!`);
-                utterance.lang = 'en-US';
-                utterance.volume = 1;
-                utterance.rate = 0.88;
-                utterance.pitch = 0.78;
-                if (preferredVoice) utterance.voice = preferredVoice;
-                utterance.onend = () => {
-                    index++;
-                    setTimeout(speakNext, 650);
-                };
-                utterance.onerror = () => {
-                    index++;
-                    setTimeout(speakNext, 250);
-                };
-                window.speechSynthesis.speak(utterance);
-            }
-
-            speakNext();
+            const utterance = new SpeechSynthesisUtterance(script);
+            utterance.lang = 'en-US';
+            utterance.volume = 1;
+            utterance.rate = 1.04;
+            utterance.pitch = 1.18;
+            if (preferredVoice) utterance.voice = preferredVoice;
+            utterance.onend = () => setTimeout(finish, 700);
+            utterance.onerror = () => setTimeout(finish, 300);
+            window.speechSynthesis.speak(utterance);
         });
     }
 
@@ -3113,17 +3079,6 @@ function ensureArcheryLotteryStyles() {
         @keyframes shellShardFly {
             0% { opacity: 1; transform: translate(-50%, -50%) scale(0.64) rotate(0); }
             100% { opacity: 0; transform: translate(calc(-50% + var(--shell-x)), calc(-50% + var(--shell-y))) scale(0.92) rotate(var(--shell-rotate)); }
-        }
-        @keyframes prizeOrbPop {
-            0% { opacity: 0; transform: translate(-50%, -38%) scale(0.16) rotate(-18deg); filter: blur(5px) brightness(1.55); }
-            24% { opacity: 1; transform: translate(-50%, -112%) scale(1.18) rotate(7deg); filter: blur(0) brightness(1.18); }
-            58% { opacity: 1; transform: translate(-50%, -100%) scale(1) rotate(-4deg); filter: blur(0) brightness(1.04); }
-            100% { opacity: 0; transform: translate(-50%, -126%) scale(0.9) rotate(9deg); filter: blur(1px) brightness(1.1); }
-        }
-        @keyframes orbSheen {
-            0% { transform: translate(-32%, -34%) rotate(-18deg); opacity: 0.38; }
-            50% { opacity: 0.72; }
-            100% { transform: translate(24%, 18%) rotate(-18deg); opacity: 0.18; }
         }
         @keyframes finalPop {
             from { opacity: 0; transform: translateY(22px) scale(0.94); }
@@ -4176,66 +4131,6 @@ function ensureArcheryLotteryStyles() {
             height: 1px;
             z-index: 10;
             pointer-events: none;
-        }
-        .archery-prize-orb {
-            position: absolute;
-            left: 0;
-            top: 0;
-            width: 92px;
-            height: 92px;
-            border-radius: 50%;
-            overflow: hidden;
-            z-index: 3;
-            background:
-                radial-gradient(circle at 27% 21%, rgba(255, 255, 255, 0.98) 0 11%, transparent 12%),
-                radial-gradient(circle at 70% 75%, rgba(202, 225, 255, 0.5), transparent 30%),
-                radial-gradient(circle at 45% 42%, rgba(136, 218, 231, 0.2), transparent 46%),
-                linear-gradient(145deg, #f9fbff 0%, #dbe7f4 54%, #eef6ff 100%);
-            border: 2px solid rgba(255, 255, 255, 0.9);
-            box-shadow:
-                0 0 0 1px rgba(136, 218, 231, 0.28),
-                0 14px 28px rgba(0, 0, 0, 0.34),
-                0 0 34px rgba(127, 214, 194, 0.56),
-                inset -16px -18px 28px rgba(102, 131, 167, 0.22),
-                inset 14px 16px 22px rgba(255, 255, 255, 0.82);
-            animation: prizeOrbPop 1.62s cubic-bezier(0.18, 0.88, 0.24, 1) forwards;
-        }
-        .archery-prize-orb::before {
-            content: '';
-            position: absolute;
-            inset: 9px 16px 50px 12px;
-            border-radius: 50%;
-            background: linear-gradient(135deg, rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0.12));
-            filter: blur(1px);
-            transform: rotate(-20deg);
-            z-index: 3;
-        }
-        .archery-prize-orb::after {
-            content: '';
-            position: absolute;
-            left: -28%;
-            top: -22%;
-            width: 72%;
-            height: 145%;
-            border-radius: 50%;
-            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.7), transparent);
-            animation: orbSheen 1.14s ease-out 0.12s forwards;
-            z-index: 4;
-        }
-        .archery-prize-orb i {
-            position: absolute;
-            left: var(--patch-left);
-            top: var(--patch-top);
-            width: var(--patch-size);
-            height: var(--patch-size);
-            border-radius: 50%;
-            background:
-                radial-gradient(circle at 32% 26%, rgba(255, 255, 255, 0.82), transparent 25%),
-                linear-gradient(135deg, var(--patch-color-a), var(--patch-color-b));
-            box-shadow: inset -5px -7px 9px rgba(32, 61, 118, 0.24), 0 0 10px rgba(127, 214, 194, 0.28);
-            transform: translate(-50%, -50%) rotate(var(--patch-rotate)) scaleY(0.72);
-            opacity: 0.82;
-            z-index: 2;
         }
         .archery-impact-burst b {
             position: absolute;
