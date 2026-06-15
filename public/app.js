@@ -2432,11 +2432,17 @@ function renderArcheryEggLotteryAnimation(container, allPlayers, winners, prizes
         field.appendChild(finalList);
         fitFinalWinnerNames(finalList);
 
-        setTimeout(() => {
+        const finishFinalDisplay = () => {
             container.style.display = 'none';
             container.innerHTML = '';
             onComplete();
-        }, 6600);
+        };
+        const minimumFinalHold = new Promise(resolve => setTimeout(resolve, 6600));
+        const announcement = announceJackpotWinners(winners);
+
+        Promise.all([minimumFinalHold, announcement])
+            .then(() => sfx.applause())
+            .then(finishFinalDisplay);
     }
 
     function createImpactBurst(targetEgg) {
@@ -2817,6 +2823,60 @@ function renderArcheryEggLotteryAnimation(container, allPlayers, winners, prizes
         element.style.overflow = 'hidden';
     }
 
+    function announceJackpotWinners(winnerNames) {
+        if (!('speechSynthesis' in window) || !window.SpeechSynthesisUtterance) {
+            return Promise.resolve();
+        }
+
+        const names = winnerNames.filter(Boolean);
+        if (names.length === 0) return Promise.resolve();
+
+        window.speechSynthesis.cancel();
+
+        return new Promise(resolve => {
+            const voices = window.speechSynthesis.getVoices();
+            const preferredVoice = voices.find(voice => /^en[-_]/i.test(voice.lang) && /grand|premium|samantha|daniel|alex|google/i.test(voice.name)) ||
+                voices.find(voice => /^en[-_]/i.test(voice.lang)) ||
+                null;
+            let index = 0;
+            let resolved = false;
+            const fallbackTimer = setTimeout(finish, Math.max(22000, names.length * 24000));
+
+            function finish() {
+                if (resolved) return;
+                resolved = true;
+                clearTimeout(fallbackTimer);
+                resolve();
+            }
+
+            function speakNext() {
+                if (index >= names.length) {
+                    setTimeout(finish, 900);
+                    return;
+                }
+
+                const name = names[index];
+                const utterance = new SpeechSynthesisUtterance(`Ladies and gentlemen, all eyes to the stage. Tonight, destiny has dealt its finest hand. A legendary jackpot has been won, and a new name enters the hall of fortune. Please give a grand round of applause to our jackpot champion — ${name}!`);
+                utterance.lang = 'en-US';
+                utterance.volume = 1;
+                utterance.rate = 0.88;
+                utterance.pitch = 0.78;
+                if (preferredVoice) utterance.voice = preferredVoice;
+                utterance.onend = () => {
+                    index++;
+                    setTimeout(speakNext, 650);
+                };
+                utterance.onerror = () => {
+                    index++;
+                    setTimeout(speakNext, 250);
+                };
+                window.speechSynthesis.speak(utterance);
+            }
+
+            speakNext();
+        });
+    }
+
     function createArcherySfx() {
         let audioCtx = null;
 
@@ -2876,6 +2936,39 @@ function renderArcheryEggLotteryAnimation(container, allPlayers, winners, prizes
             source.stop(start + duration);
         }
 
+        function applauseNoise({ duration, gain, delay, filter, pan = 0 }) {
+            if (!window.AudioContext && !window.webkitAudioContext) return;
+            const ctx = getContext();
+            const start = ctx.currentTime + delay;
+            const buffer = ctx.createBuffer(1, Math.max(1, Math.floor(ctx.sampleRate * duration)), ctx.sampleRate);
+            const data = buffer.getChannelData(0);
+            for (let i = 0; i < data.length; i++) {
+                const envelope = Math.sin(Math.PI * (i / data.length));
+                data[i] = (Math.random() * 2 - 1) * envelope;
+            }
+            const source = ctx.createBufferSource();
+            const band = ctx.createBiquadFilter();
+            const volume = ctx.createGain();
+            const stereo = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
+            source.buffer = buffer;
+            band.type = 'bandpass';
+            band.frequency.setValueAtTime(filter, start);
+            band.Q.setValueAtTime(1.4, start);
+            volume.gain.setValueAtTime(gain, start);
+            volume.gain.exponentialRampToValueAtTime(0.0001, start + duration);
+            source.connect(band);
+            band.connect(volume);
+            if (stereo) {
+                stereo.pan.setValueAtTime(pan, start);
+                volume.connect(stereo);
+                stereo.connect(ctx.destination);
+            } else {
+                volume.connect(ctx.destination);
+            }
+            source.start(start);
+            source.stop(start + duration);
+        }
+
         return {
             draw() {
                 tone({ frequency: 132, endFrequency: 72, duration: 0.62, type: 'triangle', gain: 0.07 });
@@ -2904,6 +2997,32 @@ function renderArcheryEggLotteryAnimation(container, allPlayers, winners, prizes
                 tone({ frequency: 784, endFrequency: 620, duration: 0.22, type: 'sine', gain: 0.034, delay: 0.4 });
                 noise({ duration: 0.2, gain: 0.05, filter: 2600, delay: 0.24 });
                 tone({ frequency: 196, endFrequency: 110, duration: 0.34, type: 'triangle', gain: 0.045, delay: 0.56 });
+            },
+            applause() {
+                if (!window.AudioContext && !window.webkitAudioContext) {
+                    return new Promise(resolve => setTimeout(resolve, 3000));
+                }
+
+                for (let i = 0; i < 30; i++) {
+                    const delay = i * 0.095 + Math.random() * 0.06;
+                    const fade = Math.max(0.18, 1 - delay / 3);
+                    applauseNoise({
+                        duration: 0.08 + Math.random() * 0.07,
+                        gain: 0.04 * fade,
+                        delay,
+                        filter: 1200 + Math.random() * 1800,
+                        pan: Math.random() * 1.4 - 0.7
+                    });
+                }
+
+                for (let i = 0; i < 9; i++) {
+                    const delay = 0.16 + i * 0.28;
+                    const fade = Math.max(0.16, 1 - delay / 3.1);
+                    tone({ frequency: 720 + Math.random() * 420, endFrequency: 980 + Math.random() * 520, duration: 0.18, type: 'triangle', gain: 0.012 * fade, delay });
+                    noise({ duration: 0.18, gain: 0.018 * fade, filter: 2600 + Math.random() * 1200, delay: delay + 0.04 });
+                }
+
+                return new Promise(resolve => setTimeout(resolve, 3250));
             }
         };
     }
