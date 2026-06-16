@@ -257,6 +257,10 @@ function syncPlayerIdToLotteries(oldId, newId, saveAfterSync = true) {
     return changed || poolChanged;
 }
 
+function getPlayerProfessionsText(player) {
+    return Array.isArray(player?.professions) ? player.professions.join('、') : '';
+}
+
 function getTalentPlayerIds() {
     return players.map(player => player.id);
 }
@@ -1510,7 +1514,7 @@ function renderPlayerSelectionList(searchTerm = '') {
         label.style.cssText = 'flex: 1; cursor: pointer; display: flex; justify-content: space-between;';
         label.innerHTML = `
             <span style="font-weight: bold;">${player.id}</span>
-            <span style="color: #666; font-size: 14px;">${player.professions.join('、')}</span>
+            <span style="color: #666; font-size: 14px;">${getPlayerProfessionsText(player)}</span>
         `;
 
         // 点击整行切换checkbox和状态
@@ -1589,12 +1593,19 @@ let currentEditingLotteryIndex = null;
 
 // 保存抽奖数据
 async function saveLotteries() {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
+
     try {
         const response = await fetch('/api/lotteries', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(lotteries)
+            body: JSON.stringify(lotteries),
+            signal: controller.signal
         });
+        if (!response.ok) {
+            throw new Error(`保存接口异常：${response.status}`);
+        }
         const result = await response.json();
         if (!result.success) {
             throw new Error(result.error || '保存失败');
@@ -1603,8 +1614,10 @@ async function saveLotteries() {
         return true;
     } catch (error) {
         console.error('保存抽奖数据失败:', error);
-        alert('保存抽奖数据失败：' + error.message);
+        alert('保存抽奖数据失败：' + (error.name === 'AbortError' ? '请求超时，请重试' : error.message));
         return false;
+    } finally {
+        clearTimeout(timeout);
     }
 }
 
@@ -1791,7 +1804,7 @@ function renderLotteryPlayerList(searchTerm = '') {
         label.style.cssText = `flex: 1; cursor: ${lockSelection ? 'default' : 'pointer'}; display: flex; justify-content: space-between;`;
         label.innerHTML = `
             <span style="font-weight: bold;">${player.id}</span>
-            <span style="color: #666; font-size: 14px;">${player.professions.join('、')}</span>
+            <span style="color: #666; font-size: 14px;">${getPlayerProfessionsText(player)}</span>
         `;
 
         // 点击整行切换checkbox和状态
@@ -1863,12 +1876,14 @@ function updateLotterySelectedPreview() {
 async function handleLotterySubmit(e) {
     e.preventDefault();
 
+    const submitBtn = document.getElementById('lottery-submit-btn');
+    if (submitBtn?.dataset.saving === 'true') return;
+
     const name = document.getElementById('lottery-name').value.trim();
-    const winnerCount = parseInt(document.getElementById('lottery-winner-count').value);
+    const winnerCount = parseInt(document.getElementById('lottery-winner-count').value, 10);
     const prizeInputs = document.querySelectorAll('.lottery-prize-input');
     const prizes = Array.from(prizeInputs).map(input => input.value.trim());
     const lotteryPlayerIds = Array.from(selectedLotteryPlayers);
-    const excludedPlayerIds = getLotteryExcludedPlayerIds(lotteryPlayerIds);
 
     // 验证
     if (!name) {
@@ -1891,27 +1906,81 @@ async function handleLotterySubmit(e) {
         return;
     }
 
-    const lotteryData = {
-        id: currentEditingLotteryIndex !== null ? lotteries[currentEditingLotteryIndex].id : Date.now(),
-        name,
-        winnerCount,
-        prizes,
-        playerIds: lotteryPlayerIds,
-        excludedPlayerIds,
-        createTime: currentEditingLotteryIndex !== null ? lotteries[currentEditingLotteryIndex].createTime : new Date().toISOString(),
-        winners: currentEditingLotteryIndex !== null ? lotteries[currentEditingLotteryIndex].winners : null
-    };
+    const previousLotteries = lotteries.map(lottery => ({ ...lottery }));
+    const previousButtonText = submitBtn?.textContent || '';
 
-    if (currentEditingLotteryIndex !== null) {
-        lotteries[currentEditingLotteryIndex] = lotteryData;
-    } else {
-        lotteries.push(lotteryData);
-    }
+    try {
+        if (submitBtn) {
+            submitBtn.dataset.saving = 'true';
+            submitBtn.disabled = true;
+            submitBtn.textContent = '保存中...';
+        }
 
-    const saved = await saveLotteries();
-    if (saved) {
+        const excludedPlayerIds = getLotteryExcludedPlayerIds(lotteryPlayerIds);
+        const lotteryData = {
+            id: currentEditingLotteryIndex !== null ? lotteries[currentEditingLotteryIndex].id : Date.now(),
+            name,
+            winnerCount,
+            prizes,
+            playerIds: lotteryPlayerIds,
+            excludedPlayerIds,
+            createTime: currentEditingLotteryIndex !== null ? lotteries[currentEditingLotteryIndex].createTime : new Date().toISOString(),
+            winners: currentEditingLotteryIndex !== null ? lotteries[currentEditingLotteryIndex].winners : null
+        };
+
+        if (currentEditingLotteryIndex !== null) {
+            lotteries[currentEditingLotteryIndex] = lotteryData;
+        } else {
+            lotteries.push(lotteryData);
+        }
+
+        const saved = await saveLotteries();
+        if (!saved) {
+            lotteries = previousLotteries;
+            renderLotteryTable();
+            return;
+        }
+
+        try {
+            await reloadLotteriesFromServer();
+        } catch (error) {
+            console.warn('刷新抽奖列表失败，使用本地已保存数据:', error);
+        }
         renderLotteryTable();
         closeLotteryModal();
+    } catch (error) {
+        lotteries = previousLotteries;
+        renderLotteryTable();
+        console.error('提交抽奖失败:', error);
+        alert('创建抽奖失败：' + (error.message || '未知错误'));
+    } finally {
+        if (submitBtn) {
+            submitBtn.dataset.saving = 'false';
+            submitBtn.disabled = false;
+            submitBtn.textContent = previousButtonText || (currentEditingLotteryIndex !== null ? '保存' : '创建');
+        }
+    }
+}
+
+async function reloadLotteriesFromServer() {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10000);
+
+    try {
+        const response = await fetch('/api/lotteries', { cache: 'no-store', signal: controller.signal });
+        if (!response.ok) {
+            throw new Error(`刷新抽奖列表失败：${response.status}`);
+        }
+
+        lotteries = await response.json();
+        syncLotteryPlayersWithTalent(false);
+    } catch (error) {
+        if (error.name === 'AbortError') {
+            throw new Error('刷新抽奖列表超时');
+        }
+        throw error;
+    } finally {
+        clearTimeout(timeout);
     }
 }
 
@@ -5211,6 +5280,17 @@ function setupLotteryEventListeners() {
     const lotteryForm = document.getElementById('lottery-form');
     if (lotteryForm) {
         lotteryForm.addEventListener('submit', handleLotterySubmit);
+    }
+
+    const lotterySubmitBtn = document.getElementById('lottery-submit-btn');
+    if (lotterySubmitBtn && lotteryForm) {
+        lotterySubmitBtn.addEventListener('click', () => {
+            if (lotterySubmitBtn.type !== 'submit' || lotterySubmitBtn.disabled) return;
+            if (!lotteryForm.checkValidity()) {
+                lotteryForm.reportValidity();
+                alert('请补充信息');
+            }
+        });
     }
 
     const winnerCountSelect = document.getElementById('lottery-winner-count');
